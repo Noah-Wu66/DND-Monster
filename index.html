@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>怪物血量计算器</title>
+    <link rel="icon" href="favicon.png" type="image/png">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 15px;
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            padding: 10px;
+        }
+
+        h1 {
+            text-align: center;
+            margin: 15px 0;
+            font-size: 1.5em;
+            color: #333;
+        }
+
+        .controls-panel {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .monster-controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .monster-controls button {
+            padding: 10px 15px;
+            font-size: 15px;
+            border: none;
+            border-radius: 25px;
+            background-color: #2196F3;
+            color: #fff;
+            cursor: pointer;
+            min-width: 120px;
+        }
+
+        .monster-controls button:hover {
+            background-color: #0b7dda;
+        }
+
+        .monster-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .monster-card {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            position: relative;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .monster-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .monster-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .monster-info {
+            display: flex;
+            flex-direction: column;
+            width: 75%;
+        }
+
+        .monster-name {
+            font-weight: bold;
+            font-size: 1.2em;
+            padding: 5px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            margin-bottom: 5px;
+        }
+
+        .monster-name:focus {
+            border-color: #2196F3;
+            outline: none;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            color: white;
+            background-color: #4CAF50;
+        }
+
+        .status-badge.dead {
+            background-color: #f44336;
+        }
+
+        .delete-monster {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            transition: background-color 0.2s;
+        }
+
+        .delete-monster:hover {
+            background-color: #d32f2f;
+        }
+
+        .hp-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .hp-text {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .hp-input {
+            width: 60px;
+            padding: 5px;
+            text-align: center;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .hp-input:focus {
+            border-color: #2196F3;
+            outline: none;
+        }
+
+        .hp-bar {
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .hp-bar-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 100%;
+            border-radius: 10px;
+            transition: width 0.3s ease, background-color 0.3s ease;
+        }
+
+        .hp-bar-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #000;
+            font-size: 12px;
+            text-shadow: 0 0 2px #fff;
+            z-index: 1;
+            user-select: none;
+        }
+
+        .damage-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .damage-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .damage-input:focus {
+            border-color: #2196F3;
+            outline: none;
+        }
+
+        .damage-btn, .heal-btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .damage-btn {
+            background-color: #f44336;
+        }
+
+        .damage-btn:hover {
+            background-color: #d32f2f;
+        }
+
+        .heal-btn {
+            background-color: #4CAF50;
+        }
+
+        .heal-btn:hover {
+            background-color: #388e3c;
+        }
+
+        .setup-form {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+
+        .form-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        .form-input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 80px;
+        }
+
+        .form-input:focus {
+            border-color: #2196F3;
+            outline: none;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+            font-style: italic;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        @media (max-width: 767px) {
+            .monster-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .monster-controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .monster-controls button {
+                width: 100%;
+            }
+            
+            .setup-form {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .form-group {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>怪物血量计算器</h1>
+        <div class="controls-panel">
+            <div class="monster-controls">
+                <button id="add-monster-btn">添加单个怪物</button>
+                <button id="add-multiple-btn">批量添加怪物</button>
+                <button id="reset-all-btn">重置所有</button>
+            </div>
+            <div class="setup-form">
+                <div class="form-group">
+                    <label for="monster-name-prefix">怪物名称前缀:</label>
+                    <input type="text" id="monster-name-prefix" class="form-input" value="怪物" style="width: 100px;">
+                </div>
+                <div class="form-group">
+                    <label for="default-hp">默认血量:</label>
+                    <input type="number" id="default-hp" class="form-input" value="100" min="1">
+                </div>
+                <div class="form-group">
+                    <label for="monster-count">批量数量:</label>
+                    <input type="number" id="monster-count" class="form-input" value="4" min="1" max="20">
+                </div>
+            </div>
+        </div>
+        <div id="monster-container" class="monster-grid">
+            <!-- 怪物卡片会在这里动态添加 -->
+            <div class="empty-state">
+                点击上方按钮添加怪物
+            </div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const monsterContainer = document.getElementById("monster-container");
+            const addMonsterBtn = document.getElementById("add-monster-btn");
+            const addMultipleBtn = document.getElementById("add-multiple-btn");
+            const resetAllBtn = document.getElementById("reset-all-btn");
+            const defaultHpInput = document.getElementById("default-hp");
+            const monsterCountInput = document.getElementById("monster-count");
+            const monsterNamePrefix = document.getElementById("monster-name-prefix");
+            
+            let monsterCounter = 1;
+
+            function createMonsterCard(name, maxHp) {
+                const monsterId = `monster-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                const currentHp = maxHp;
+
+                // 移除空状态提示
+                const emptyState = monsterContainer.querySelector(".empty-state");
+                if (emptyState) {
+                    emptyState.remove();
+                }
+
+                const monsterCard = document.createElement("div");
+                monsterCard.className = "monster-card";
+                monsterCard.dataset.id = monsterId;
+
+                monsterCard.innerHTML = `
+                    <div class="monster-header">
+                        <div class="monster-info">
+                            <div class="monster-name" contenteditable="true">${name}</div>
+                            <span class="status-badge">存活</span>
+                        </div>
+                        <button class="delete-monster" title="删除怪物">&times;</button>
+                    </div>
+                    <div class="hp-display">
+                        <span class="hp-text">HP: <span class="current-hp">${currentHp}</span>/<span class="max-hp">${maxHp}</span></span>
+                        <input type="number" class="hp-input max-hp-input" value="${maxHp}" min="1" title="最大生命值">
+                    </div>
+                    <div class="hp-bar">
+                        <div class="hp-bar-fill" style="width: 100%"></div>
+                        <div class="hp-bar-text">${currentHp}/${maxHp}</div>
+                    </div>
+                    <div class="damage-controls">
+                        <input type="number" class="damage-input" placeholder="数值" min="0">
+                        <button class="damage-btn">伤害</button>
+                        <button class="heal-btn">治疗</button>
+                    </div>
+                `;
+
+                // 删除怪物事件
+                monsterCard.querySelector(".delete-monster").addEventListener("click", () => {
+                    monsterCard.remove();
+                    
+                    // 如果没有怪物了，显示空状态提示
+                    if (monsterContainer.children.length === 0) {
+                        showEmptyState();
+                    }
+                });
+
+                // 最大血量修改事件
+                const maxHpInput = monsterCard.querySelector(".max-hp-input");
+                maxHpInput.addEventListener("change", () => {
+                    const newMaxHp = parseInt(maxHpInput.value) || 1;
+                    if (newMaxHp < 1) maxHpInput.value = 1;
+                    
+                    const maxHpDisplay = monsterCard.querySelector(".max-hp");
+                    const currentHpDisplay = monsterCard.querySelector(".current-hp");
+                    
+                    maxHpDisplay.textContent = newMaxHp;
+                    
+                    // 如果当前血量超过新的最大血量，则调整当前血量
+                    const currentHp = parseInt(currentHpDisplay.textContent);
+                    if (currentHp > newMaxHp) {
+                        currentHpDisplay.textContent = newMaxHp;
+                        updateHpBar(monsterCard, newMaxHp, newMaxHp);
+                    } else {
+                        updateHpBar(monsterCard, currentHp, newMaxHp);
+                    }
+                });
+
+                // 伤害按钮事件
+                const damageBtn = monsterCard.querySelector(".damage-btn");
+                damageBtn.addEventListener("click", () => {
+                    applyDamage(monsterCard, true);
+                });
+
+                // 治疗按钮事件
+                const healBtn = monsterCard.querySelector(".heal-btn");
+                healBtn.addEventListener("click", () => {
+                    applyDamage(monsterCard, false);
+                });
+
+                // 让伤害输入框支持回车键应用伤害
+                const damageInput = monsterCard.querySelector(".damage-input");
+                damageInput.addEventListener("keypress", (e) => {
+                    if (e.key === "Enter") {
+                        applyDamage(monsterCard, true);
+                    }
+                });
+
+                return monsterCard;
+            }
+
+            function updateHpBar(monsterCard, currentHp, maxHp) {
+                const hpBarFill = monsterCard.querySelector(".hp-bar-fill");
+                const hpBarText = monsterCard.querySelector(".hp-bar-text");
+                const statusBadge = monsterCard.querySelector(".status-badge");
+                
+                const hpPercentage = (currentHp / maxHp) * 100;
+                hpBarFill.style.width = `${hpPercentage}%`;
+                hpBarText.textContent = `${currentHp}/${maxHp}`;
+
+                // 根据血量百分比更新颜色
+                if (hpPercentage > 50) {
+                    hpBarFill.style.backgroundColor = "#4CAF50"; // 绿色
+                } else if (hpPercentage > 20) {
+                    hpBarFill.style.backgroundColor = "#FFC107"; // 黄色
+                } else {
+                    hpBarFill.style.backgroundColor = "#F44336"; // 红色
+                }
+
+                // 更新状态徽章
+                if (currentHp <= 0) {
+                    statusBadge.textContent = "死亡";
+                    statusBadge.classList.add("dead");
+                    monsterCard.style.opacity = "0.7";
+                } else {
+                    statusBadge.textContent = "存活";
+                    statusBadge.classList.remove("dead");
+                    monsterCard.style.opacity = "1";
+                }
+            }
+
+            function applyDamage(monsterCard, isDamage) {
+                const damageInput = monsterCard.querySelector(".damage-input");
+                const value = parseInt(damageInput.value) || 0;
+                if (value <= 0) return;
+
+                const currentHpDisplay = monsterCard.querySelector(".current-hp");
+                const maxHpDisplay = monsterCard.querySelector(".max-hp");
+                
+                let currentHp = parseInt(currentHpDisplay.textContent);
+                const maxHp = parseInt(maxHpDisplay.textContent);
+
+                if (isDamage) {
+                    currentHp = Math.max(0, currentHp - value);
+                } else {
+                    currentHp = Math.min(maxHp, currentHp + value);
+                }
+
+                currentHpDisplay.textContent = currentHp;
+                updateHpBar(monsterCard, currentHp, maxHp);
+                damageInput.value = "";
+                damageInput.focus();
+            }
+
+            function showEmptyState() {
+                const emptyState = document.createElement("div");
+                emptyState.className = "empty-state";
+                emptyState.textContent = "点击上方按钮添加怪物";
+                monsterContainer.appendChild(emptyState);
+            }
+
+            // 添加单个怪物按钮事件
+            addMonsterBtn.addEventListener("click", () => {
+                const name = `${monsterNamePrefix.value} ${monsterCounter++}`;
+                const maxHp = parseInt(defaultHpInput.value) || 100;
+                const newMonsterCard = createMonsterCard(name, maxHp);
+                monsterContainer.appendChild(newMonsterCard);
+            });
+
+            // 批量添加怪物按钮事件
+            addMultipleBtn.addEventListener("click", () => {
+                const count = parseInt(monsterCountInput.value) || 4;
+                const limitedCount = Math.min(Math.max(count, 1), 20); // 限制在1-20之间
+                const maxHp = parseInt(defaultHpInput.value) || 100;
+                const fragment = document.createDocumentFragment();
+                
+                for (let i = 0; i < limitedCount; i++) {
+                    const name = `${monsterNamePrefix.value} ${monsterCounter++}`;
+                    const newMonsterCard = createMonsterCard(name, maxHp);
+                    fragment.appendChild(newMonsterCard);
+                }
+                
+                monsterContainer.appendChild(fragment);
+            });
+
+            // 重置所有按钮事件
+            resetAllBtn.addEventListener("click", () => {
+                if (confirm("确定要移除所有怪物吗？")) {
+                    monsterContainer.innerHTML = "";
+                    monsterCounter = 1;
+                    showEmptyState();
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

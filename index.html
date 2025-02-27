@@ -4,18 +4,52 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>怪物血量计算器</title>
+    <title>战斗助手 - 怪物与冒险者</title>
     <link rel="icon" href="favicon.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --monster-primary: #ae3e3e;
+            --monster-secondary: #ffd1d1;
+            --monster-accent: #ff9898;
+            --monster-border: #dc5050;
+            
+            --adventurer-primary: #2a6aa8;
+            --adventurer-secondary: #d1e5ff;
+            --adventurer-accent: #98c2ff;
+            --adventurer-border: #5080dc;
+            
+            --neutral-bg: #f9f9f9;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --text-light: #666666;
+            --border-color: #dddddd;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            
+            --green: #4CAF50;
+            --yellow: #FFC107;
+            --red: #F44336;
+            --blue: #2196F3;
+            --purple: #9C27B0;
+            --orange: #FF9800;
+            --temp-hp: #1E88E5;
+        }
+
         * {
             box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
         body {
             margin: 0;
             padding: 15px;
-            font-family: Arial, sans-serif;
-            background-color: #f9f9f9;
+            font-family: 'Noto Sans SC', Arial, sans-serif;
+            background-color: var(--neutral-bg);
+            color: var(--text-color);
+            line-height: 1.5;
         }
 
         .container {
@@ -27,17 +61,23 @@
         h1 {
             text-align: center;
             margin: 15px 0;
-            font-size: 1.5em;
-            color: #333;
+            font-size: 1.8em;
+            color: var(--text-color);
+            font-weight: 700;
         }
 
+        /* 控制面板样式 */
         .controls-panel {
-            background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
             margin-bottom: 20px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 12px var(--shadow-color);
+            transition: box-shadow 0.3s ease;
+        }
+
+        .controls-panel:hover {
+            box-shadow: 0 8px 16px var(--shadow-color);
         }
 
         .monster-controls {
@@ -49,141 +89,368 @@
         }
 
         .monster-controls button {
-            padding: 10px 15px;
+            padding: 12px 20px;
             font-size: 15px;
             border: none;
-            border-radius: 25px;
-            background-color: #2196F3;
-            color: #fff;
+            border-radius: 30px;
+            color: white;
+            font-weight: 500;
             cursor: pointer;
-            min-width: 120px;
+            min-width: 150px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px var(--shadow-color);
         }
 
-        .monster-controls button:hover {
-            background-color: #0b7dda;
+        #add-monster-btn {
+            background-color: var(--monster-primary);
         }
 
+        #add-monster-btn:hover {
+            background-color: #922e2e;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(174, 62, 62, 0.3);
+        }
+
+        #add-adventurer-btn {
+            background-color: var(--adventurer-primary);
+        }
+
+        #add-adventurer-btn:hover {
+            background-color: #1a5185;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(42, 106, 168, 0.3);
+        }
+
+        #reset-all-btn {
+            background-color: var(--orange);
+        }
+
+        #reset-all-btn:hover {
+            background-color: #e68900;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(255, 152, 0, 0.3);
+        }
+
+        .setup-form {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .form-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group label {
+            font-size: 14px;
+            white-space: nowrap;
+            color: var(--text-light);
+        }
+
+        .form-input {
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            width: 100px;
+            font-family: inherit;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
+            outline: none;
+        }
+
+        /* 卡片容器样式 */
         .monster-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
             justify-content: center;
         }
 
+        /* 卡片样式 */
         .monster-card {
-            background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 18px;
+            box-shadow: 0 4px 8px var(--shadow-color);
             position: relative;
             transition: transform 0.2s, box-shadow 0.2s;
+            cursor: move;
+            overflow: hidden;
+        }
+
+        .monster-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background-color: var(--monster-primary);
+        }
+
+        .monster-card[data-type="monster"] {
+            border: 1px solid var(--monster-border);
+        }
+
+        .monster-card[data-type="monster"]::before {
+            background-color: var(--monster-primary);
+        }
+
+        .monster-card[data-type="monster"] .monster-name {
+            background-color: var(--monster-secondary);
+        }
+        
+        .monster-card[data-type="adventurer"] {
+            border: 1px solid var(--adventurer-border);
+        }
+
+        .monster-card[data-type="adventurer"]::before {
+            background-color: var(--adventurer-primary);
+        }
+
+        .monster-card[data-type="adventurer"] .monster-name {
+            background-color: var(--adventurer-secondary);
         }
 
         .monster-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 16px var(--shadow-color);
+        }
+        
+        .monster-card.locked {
+            border: 2px solid var(--yellow);
+            box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
         }
 
+        .monster-card.drag-over {
+            border: 2px dashed var(--blue);
+        }
+
+        /* 卡片头部样式 */
         .monster-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
         }
 
         .monster-info {
             display: flex;
             flex-direction: column;
             width: 75%;
+            gap: 5px;
         }
 
         .monster-name {
-            font-weight: bold;
+            font-weight: 700;
             font-size: 1.2em;
-            padding: 5px;
-            border: 1px solid transparent;
-            border-radius: 4px;
-            margin-bottom: 5px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            width: 100%;
+            transition: background-color 0.2s;
         }
 
         .monster-name:focus {
-            border-color: #2196F3;
             outline: none;
+            box-shadow: 0 0 0 2px var(--blue);
+        }
+
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 5px;
         }
 
         .status-badge {
             display: inline-block;
-            padding: 3px 8px;
-            border-radius: 12px;
+            padding: 4px 10px;
+            border-radius: 15px;
             font-size: 12px;
             color: white;
-            background-color: #4CAF50;
+            background-color: var(--green);
+            font-weight: 500;
+            transition: background-color 0.2s;
         }
 
         .status-badge.dead {
-            background-color: #f44336;
+            background-color: var(--red);
+        }
+        
+        .condition-tag {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            color: white;
+            background-color: var(--purple);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .condition-tag:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(156, 39, 176, 0.3);
         }
 
-        .delete-monster {
-            background-color: #f44336;
-            color: white;
+        .condition-tag.custom {
+            background-color: var(--blue);
+        }
+
+        /* 卡片操作按钮 */
+        .card-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .card-action-btn {
+            background-color: transparent;
             border: none;
             border-radius: 50%;
-            width: 30px;
-            height: 30px;
+            width: 36px;
+            height: 36px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             font-size: 18px;
-            transition: background-color 0.2s;
+            transition: all 0.2s;
+            color: var(--text-light);
         }
 
-        .delete-monster:hover {
+        .card-action-btn:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .lock-button {
+            font-size: 20px;
+        }
+
+        .status-button {
+            font-size: 18px;
+        }
+
+        .delete-button {
+            color: white;
+            background-color: var(--red);
+        }
+
+        .delete-button:hover {
             background-color: #d32f2f;
         }
 
+        /* 血量显示样式 */
         .hp-display {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
 
         .hp-text {
             font-size: 18px;
-            font-weight: bold;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .hp-inputs {
+            display: flex;
+            gap: 5px;
+            align-items: center;
         }
 
         .hp-input {
             width: 60px;
-            padding: 5px;
+            padding: 8px;
             text-align: center;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
 
         .hp-input:focus {
-            border-color: #2196F3;
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
             outline: none;
         }
 
-        .hp-bar {
-            height: 20px;
-            background-color: #f0f0f0;
-            border-radius: 10px;
+        .temp-hp-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .temp-hp-text {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--blue);
+        }
+
+        .temp-hp-input {
+            width: 60px;
+            padding: 8px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .temp-hp-input:focus {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
+            outline: none;
+        }
+
+        /* 血条样式 */
+        .hp-bar-container {
+            position: relative;
+            height: 22px;
             margin-bottom: 15px;
+        }
+
+        .hp-bar {
+            height: 22px;
+            background-color: var(--red); /* 红色背景表示失去的血量 */
+            border-radius: 10px;
             overflow: hidden;
             position: relative;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
         }
 
         .hp-bar-fill {
             height: 100%;
-            background-color: #4CAF50;
+            background-color: var(--green);
             width: 100%;
             border-radius: 10px;
-            transition: width 0.3s ease, background-color 0.3s ease;
+            transition: width 0.3s ease-out, background-color 0.3s ease;
+            box-shadow: inset 0 1px 2px rgba(255,255,255,0.3);
+        }
+
+        .temp-hp-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 22px;
+            background-color: var(--temp-hp);
+            border-radius: 10px;
+            transition: width 0.3s ease-out;
+            box-shadow: inset 0 1px 2px rgba(255,255,255,0.3);
+            z-index: 2;
         }
 
         .hp-bar-text {
@@ -193,11 +460,13 @@
             transform: translate(-50%, -50%);
             color: #000;
             font-size: 12px;
-            text-shadow: 0 0 2px #fff;
-            z-index: 1;
+            font-weight: 700;
+            text-shadow: 0 0 3px white, 0 0 3px white;
+            z-index: 3;
             user-select: none;
         }
 
+        /* 伤害控制样式 */
         .damage-controls {
             display: flex;
             gap: 10px;
@@ -206,85 +475,267 @@
 
         .damage-input {
             flex: 1;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
             text-align: center;
+            font-family: inherit;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
 
         .damage-input:focus {
-            border-color: #2196F3;
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
             outline: none;
         }
 
         .damage-btn, .heal-btn {
-            padding: 8px 15px;
+            padding: 10px 15px;
             border: none;
-            border-radius: 4px;
+            border-radius: 8px;
             color: white;
+            font-weight: 500;
             cursor: pointer;
-            transition: background-color 0.2s;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px var(--shadow-color);
         }
 
         .damage-btn {
-            background-color: #f44336;
+            background-color: var(--red);
         }
 
         .damage-btn:hover {
             background-color: #d32f2f;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(244, 67, 54, 0.3);
         }
 
         .heal-btn {
-            background-color: #4CAF50;
+            background-color: var(--green);
         }
 
         .heal-btn:hover {
             background-color: #388e3c;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
         }
 
-        .setup-form {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 10px;
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #eee;
-        }
-
-        .form-group {
+        /* 状态选择器 */
+        .status-selector {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
             display: flex;
             align-items: center;
-            gap: 8px;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        
+        .status-selector.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .status-panel {
+            background-color: white;
+            border-radius: 12px;
+            padding: 20px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            transform: translateY(20px);
+            transition: transform 0.3s;
+        }
+        
+        .status-selector.active .status-panel {
+            transform: translateY(0);
+        }
+        
+        .status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .status-title {
+            font-size: 1.5em;
+            font-weight: 700;
+        }
+        
+        .close-status {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-light);
+            transition: color 0.2s;
+        }
+        
+        .close-status:hover {
+            color: var(--text-color);
         }
 
-        .form-group label {
-            font-size: 14px;
-            white-space: nowrap;
+        .custom-status {
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
         }
 
-        .form-input {
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            width: 80px;
+        .custom-status-title {
+            font-weight: 700;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
 
-        .form-input:focus {
-            border-color: #2196F3;
+        .custom-status-title svg {
+            width: 20px;
+            height: 20px;
+            fill: var(--blue);
+        }
+
+        .custom-status-inputs {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .custom-status-input {
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-family: inherit;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .custom-status-input:focus {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
             outline: none;
         }
 
-        .empty-state {
-            text-align: center;
-            padding: 30px;
-            color: #666;
-            font-style: italic;
-            border: 2px dashed #ddd;
+        .add-custom-btn {
+            background-color: var(--blue);
+            color: white;
+            border: none;
             border-radius: 8px;
-            margin: 20px 0;
+            padding: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 10px;
+            font-weight: 500;
         }
 
+        .add-custom-btn:hover {
+            background-color: #0b7dda;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3);
+        }
+        
+        .conditions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        
+        .condition-item {
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .condition-item:hover {
+            border-color: var(--blue);
+            box-shadow: 0 4px 8px var(--shadow-color);
+            transform: translateY(-2px);
+        }
+        
+        .condition-item.selected {
+            background-color: var(--adventurer-secondary);
+            border-color: var(--adventurer-border);
+        }
+
+        .condition-item.custom-condition {
+            border-left: 3px solid var(--blue);
+        }
+        
+        .condition-name {
+            font-weight: 700;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .condition-desc {
+            font-size: 13px;
+            color: var(--text-light);
+        }
+        
+        .status-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .status-buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .cancel-status {
+            background-color: #f1f1f1;
+            color: var(--text-color);
+        }
+        
+        .cancel-status:hover {
+            background-color: #e0e0e0;
+        }
+        
+        .apply-status {
+            background-color: var(--blue);
+            color: white;
+        }
+        
+        .apply-status:hover {
+            background-color: #0b7dda;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-light);
+            font-style: italic;
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            margin: 20px 0;
+            grid-column: 1 / -1;
+        }
+
+        /* 移动端优化 */
         @media (max-width: 767px) {
             .monster-grid {
                 grid-template-columns: 1fr;
@@ -301,12 +752,46 @@
             
             .setup-form {
                 flex-direction: column;
-                align-items: center;
+                align-items: stretch;
             }
             
             .form-group {
                 width: 100%;
                 justify-content: space-between;
+            }
+            
+            .conditions-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                padding: 5px;
+            }
+            
+            body {
+                padding: 10px;
+            }
+            
+            .monster-card {
+                padding: 15px;
+            }
+            
+            .hp-text {
+                font-size: 16px;
+            }
+
+            .hp-inputs {
+                flex-direction: column;
+                align-items: flex-end;
+            }
+            
+            .damage-controls {
+                flex-wrap: wrap;
+            }
+            
+            .damage-btn, .heal-btn {
+                flex: 1;
+                min-width: 80px;
             }
         }
     </style>
@@ -314,50 +799,137 @@
 
 <body>
     <div class="container">
-        <h1>怪物血量计算器</h1>
+        <h1>战斗助手</h1>
         <div class="controls-panel">
             <div class="monster-controls">
-                <button id="add-monster-btn">添加单个怪物</button>
-                <button id="add-multiple-btn">批量添加怪物</button>
+                <button id="add-monster-btn">添加怪物</button>
+                <button id="add-adventurer-btn">添加冒险者</button>
                 <button id="reset-all-btn">重置所有</button>
             </div>
             <div class="setup-form">
                 <div class="form-group">
                     <label for="monster-name-prefix">怪物名称前缀:</label>
-                    <input type="text" id="monster-name-prefix" class="form-input" value="怪物" style="width: 100px;">
+                    <input type="text" id="monster-name-prefix" class="form-input" value="怪物" style="width: 120px;">
+                </div>
+                <div class="form-group">
+                    <label for="adventurer-name-prefix">冒险者名称前缀:</label>
+                    <input type="text" id="adventurer-name-prefix" class="form-input" value="冒险者" style="width: 120px;">
                 </div>
                 <div class="form-group">
                     <label for="default-hp">默认血量:</label>
                     <input type="number" id="default-hp" class="form-input" value="100" min="1">
-                </div>
-                <div class="form-group">
-                    <label for="monster-count">批量数量:</label>
-                    <input type="number" id="monster-count" class="form-input" value="4" min="1" max="20">
                 </div>
             </div>
         </div>
         <div id="monster-container" class="monster-grid">
             <!-- 怪物卡片会在这里动态添加 -->
             <div class="empty-state">
-                点击上方按钮添加怪物
+                点击上方按钮添加怪物或冒险者
             </div>
         </div>
     </div>
+    
+    <!-- 状态选择器面板 -->
+    <div class="status-selector" id="status-selector">
+        <div class="status-panel">
+            <div class="status-header">
+                <h2 class="status-title">选择状态</h2>
+                <button class="close-status">&times;</button>
+            </div>
+            <div class="custom-status">
+                <div class="custom-status-title">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
+                    </svg>
+                    添加自定义状态
+                </div>
+                <div class="custom-status-inputs">
+                    <input type="text" class="custom-status-input" id="custom-status-name" placeholder="状态名称">
+                    <input type="text" class="custom-status-input" id="custom-status-desc" placeholder="状态描述">
+                    <button class="add-custom-btn" id="add-custom-status">添加</button>
+                </div>
+            </div>
+            <div class="conditions-grid">
+                <!-- 状态会动态添加 -->
+            </div>
+            <div class="status-buttons">
+                <button class="cancel-status">取消</button>
+                <button class="apply-status">应用</button>
+            </div>
+        </div>
+    </div>
+    
     <script>
         document.addEventListener("DOMContentLoaded", () => {
             const monsterContainer = document.getElementById("monster-container");
             const addMonsterBtn = document.getElementById("add-monster-btn");
-            const addMultipleBtn = document.getElementById("add-multiple-btn");
+            const addAdventurerBtn = document.getElementById("add-adventurer-btn");
             const resetAllBtn = document.getElementById("reset-all-btn");
             const defaultHpInput = document.getElementById("default-hp");
-            const monsterCountInput = document.getElementById("monster-count");
             const monsterNamePrefix = document.getElementById("monster-name-prefix");
+            const adventurerNamePrefix = document.getElementById("adventurer-name-prefix");
+            
+            // 状态选择器元素
+            const statusSelector = document.getElementById("status-selector");
+            const conditionsGrid = statusSelector.querySelector(".conditions-grid");
+            const closeStatusBtn = statusSelector.querySelector(".close-status");
+            const cancelStatusBtn = statusSelector.querySelector(".cancel-status");
+            const applyStatusBtn = statusSelector.querySelector(".apply-status");
+            const customStatusName = document.getElementById("custom-status-name");
+            const customStatusDesc = document.getElementById("custom-status-desc");
+            const addCustomStatusBtn = document.getElementById("add-custom-status");
             
             let monsterCounter = 1;
+            let adventurerCounter = 1;
+            let dragSrcEl = null;
+            let currentCardForStatus = null;
+            let customConditionCounter = 1;
+            
+            // 定义状态列表
+            const conditions = [
+                { id: "blinded", name: "目盲", desc: "无法视物，视觉相关检定失败。受攻击时对方有优势，自身攻击有劣势。" },
+                { id: "charmed", name: "魅惑", desc: "无法攻击魅惑者，魅惑者的社交检定有优势。" },
+                { id: "deafened", name: "耳聋", desc: "无法听音，听觉相关检定失败。" },
+                { id: "frightened", name: "恐慌", desc: "在恐慌源头视线内时检定有劣势，且无法主动靠近源头。" },
+                { id: "grappled", name: "擒抱", desc: "速度归零，被移动或擒抱者失能时状态解除。" },
+                { id: "incapacitated", name: "失能", desc: "无法执行任何动作或反应。" },
+                { id: "invisible", name: "隐形", desc: "只能被特殊方式察觉，攻击他人有优势，被攻击有劣势。" },
+                { id: "paralyzed", name: "麻痹", desc: "无法行动说话，豁免失败，被近战攻击必暴击。" },
+                { id: "petrified", name: "石化", desc: "变为雕像，免疫伤害和毒素，攻击检定有优势。" },
+                { id: "exhaustion", name: "力竭", desc: "分6级，逐级叠加负面效果（属性劣势、速度减半、濒死等）。" },
+                { id: "poisoned", name: "中毒", desc: "攻击检定和属性检定均有劣势。" },
+                { id: "prone", name: "倒地", desc: "需爬行移动，近战攻击对其有优势，远程攻击有劣势。" },
+                { id: "restrained", name: "束缚", desc: "速度归零，攻击与被攻击均有劣势，敏捷豁免劣势。" },
+                { id: "stunned", name: "震慑", desc: "无法行动说话，豁免失败，被攻击有优势。" },
+                { id: "unconscious", name: "昏迷", desc: "完全失去意识，近战攻击必暴击，豁免失败。" }
+            ];
 
-            function createMonsterCard(name, maxHp) {
+            // 添加自定义状态
+            addCustomStatusBtn.addEventListener("click", () => {
+                const name = customStatusName.value.trim();
+                const desc = customStatusDesc.value.trim();
+                
+                if (!name) {
+                    alert("请输入状态名称");
+                    return;
+                }
+                
+                const id = `custom-${Date.now()}-${customConditionCounter++}`;
+                const customCondition = { id, name, desc, custom: true };
+                
+                // 添加到状态选择器中
+                addConditionToGrid(customCondition);
+                
+                // 清空输入
+                customStatusName.value = "";
+                customStatusDesc.value = "";
+                customStatusName.focus();
+            });
+
+            function createMonsterCard(name, maxHp, isAdventurer = false) {
                 const monsterId = `monster-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
                 const currentHp = maxHp;
+                const tempHp = 0;
 
                 // 移除空状态提示
                 const emptyState = monsterContainer.querySelector(".empty-state");
@@ -368,21 +940,44 @@
                 const monsterCard = document.createElement("div");
                 monsterCard.className = "monster-card";
                 monsterCard.dataset.id = monsterId;
+                monsterCard.dataset.type = isAdventurer ? "adventurer" : "monster";
+                monsterCard.dataset.conditions = "[]"; // 存储状态的JSON字符串
+                
+                // 添加拖拽属性
+                monsterCard.setAttribute("draggable", "true");
 
                 monsterCard.innerHTML = `
                     <div class="monster-header">
                         <div class="monster-info">
                             <div class="monster-name" contenteditable="true">${name}</div>
-                            <span class="status-badge">存活</span>
+                            <div class="tags-container">
+                                <span class="status-badge">存活</span>
+                                <!-- 状态标签会在这里添加 -->
+                            </div>
                         </div>
-                        <button class="delete-monster" title="删除怪物">&times;</button>
+                        <div class="card-actions">
+                            <button class="card-action-btn status-button" title="管理状态">⚡</button>
+                            <button class="card-action-btn lock-button" title="锁定卡片">🔓</button>
+                            <button class="card-action-btn delete-button" title="删除">×</button>
+                        </div>
                     </div>
                     <div class="hp-display">
-                        <span class="hp-text">HP: <span class="current-hp">${currentHp}</span>/<span class="max-hp">${maxHp}</span></span>
-                        <input type="number" class="hp-input max-hp-input" value="${maxHp}" min="1" title="最大生命值">
+                        <span class="hp-text">HP:</span>
+                        <div class="hp-inputs">
+                            <input type="number" class="hp-input current-hp-input" value="${currentHp}" min="0" title="当前生命值">
+                            <span>/</span>
+                            <input type="number" class="hp-input max-hp-input" value="${maxHp}" min="1" title="最大生命值">
+                        </div>
                     </div>
-                    <div class="hp-bar">
-                        <div class="hp-bar-fill" style="width: 100%"></div>
+                    <div class="temp-hp-display">
+                        <span class="temp-hp-text">临时HP:</span>
+                        <input type="number" class="temp-hp-input" value="${tempHp}" min="0" title="临时生命值">
+                    </div>
+                    <div class="hp-bar-container">
+                        <div class="hp-bar">
+                            <div class="hp-bar-fill" style="width: 100%"></div>
+                        </div>
+                        <div class="temp-hp-bar" style="width: 0%"></div>
                         <div class="hp-bar-text">${currentHp}/${maxHp}</div>
                     </div>
                     <div class="damage-controls">
@@ -393,7 +988,7 @@
                 `;
 
                 // 删除怪物事件
-                monsterCard.querySelector(".delete-monster").addEventListener("click", () => {
+                monsterCard.querySelector(".delete-button").addEventListener("click", () => {
                     monsterCard.remove();
                     
                     // 如果没有怪物了，显示空状态提示
@@ -402,25 +997,76 @@
                     }
                 });
 
+                // 锁定按钮事件
+                const lockButton = monsterCard.querySelector(".lock-button");
+                lockButton.addEventListener("click", () => {
+                    monsterCard.classList.toggle("locked");
+                    
+                    if (monsterCard.classList.contains("locked")) {
+                        lockButton.textContent = "🔒";
+                        lockButton.title = "解锁卡片";
+                    } else {
+                        lockButton.textContent = "🔓";
+                        lockButton.title = "锁定卡片";
+                    }
+                });
+                
+                // 状态按钮事件
+                const statusButton = monsterCard.querySelector(".status-button");
+                statusButton.addEventListener("click", () => {
+                    openStatusSelector(monsterCard);
+                });
+
+                // 当前生命值修改事件
+                const currentHpInput = monsterCard.querySelector(".current-hp-input");
+                currentHpInput.addEventListener("change", () => {
+                    let newCurrentHp = parseInt(currentHpInput.value) || 0;
+                    if (newCurrentHp < 0) {
+                        newCurrentHp = 0;
+                        currentHpInput.value = 0;
+                    }
+                    
+                    const maxHpInput = monsterCard.querySelector(".max-hp-input");
+                    const maxHp = parseInt(maxHpInput.value) || 1;
+                    
+                    if (newCurrentHp > maxHp) {
+                        newCurrentHp = maxHp;
+                        currentHpInput.value = maxHp;
+                    }
+                    
+                    updateHpBar(monsterCard);
+                });
+
                 // 最大血量修改事件
                 const maxHpInput = monsterCard.querySelector(".max-hp-input");
                 maxHpInput.addEventListener("change", () => {
                     const newMaxHp = parseInt(maxHpInput.value) || 1;
-                    if (newMaxHp < 1) maxHpInput.value = 1;
+                    if (newMaxHp < 1) {
+                        maxHpInput.value = 1;
+                    }
                     
-                    const maxHpDisplay = monsterCard.querySelector(".max-hp");
-                    const currentHpDisplay = monsterCard.querySelector(".current-hp");
-                    
-                    maxHpDisplay.textContent = newMaxHp;
+                    const currentHpInput = monsterCard.querySelector(".current-hp-input");
+                    let currentHp = parseInt(currentHpInput.value) || 0;
                     
                     // 如果当前血量超过新的最大血量，则调整当前血量
-                    const currentHp = parseInt(currentHpDisplay.textContent);
                     if (currentHp > newMaxHp) {
-                        currentHpDisplay.textContent = newMaxHp;
-                        updateHpBar(monsterCard, newMaxHp, newMaxHp);
-                    } else {
-                        updateHpBar(monsterCard, currentHp, newMaxHp);
+                        currentHp = newMaxHp;
+                        currentHpInput.value = newMaxHp;
                     }
+                    
+                    updateHpBar(monsterCard);
+                });
+
+                // 临时生命值修改事件
+                const tempHpInput = monsterCard.querySelector(".temp-hp-input");
+                tempHpInput.addEventListener("change", () => {
+                    let newTempHp = parseInt(tempHpInput.value) || 0;
+                    if (newTempHp < 0) {
+                        newTempHp = 0;
+                        tempHpInput.value = 0;
+                    }
+                    
+                    updateHpBar(monsterCard);
                 });
 
                 // 伤害按钮事件
@@ -443,25 +1089,53 @@
                     }
                 });
 
+                // 添加拖拽事件监听器
+                monsterCard.addEventListener("dragstart", handleDragStart);
+                monsterCard.addEventListener("dragover", handleDragOver);
+                monsterCard.addEventListener("dragenter", handleDragEnter);
+                monsterCard.addEventListener("dragleave", handleDragLeave);
+                monsterCard.addEventListener("drop", handleDrop);
+                monsterCard.addEventListener("dragend", handleDragEnd);
+
                 return monsterCard;
             }
 
-            function updateHpBar(monsterCard, currentHp, maxHp) {
-                const hpBarFill = monsterCard.querySelector(".hp-bar-fill");
-                const hpBarText = monsterCard.querySelector(".hp-bar-text");
+            function updateHpBar(monsterCard) {
+                const currentHpInput = monsterCard.querySelector(".current-hp-input");
+                const maxHpInput = monsterCard.querySelector(".max-hp-input");
+                const tempHpInput = monsterCard.querySelector(".temp-hp-input");
                 const statusBadge = monsterCard.querySelector(".status-badge");
                 
+                const currentHp = parseInt(currentHpInput.value) || 0;
+                const maxHp = parseInt(maxHpInput.value) || 1;
+                const tempHp = parseInt(tempHpInput.value) || 0;
+                
+                const hpBarFill = monsterCard.querySelector(".hp-bar-fill");
+                const tempHpBar = monsterCard.querySelector(".temp-hp-bar");
+                const hpBarText = monsterCard.querySelector(".hp-bar-text");
+                
+                // 更新主HP条
                 const hpPercentage = (currentHp / maxHp) * 100;
                 hpBarFill.style.width = `${hpPercentage}%`;
-                hpBarText.textContent = `${currentHp}/${maxHp}`;
+                
+                // 更新临时HP条 (注意临时HP显示在主HP条之上)
+                const tempHpPercentage = (tempHp / maxHp) * 100;
+                tempHpBar.style.width = tempHp > 0 ? `${tempHpPercentage}%` : "0";
+                
+                // 更新血条文本
+                if (tempHp > 0) {
+                    hpBarText.textContent = `${currentHp}/${maxHp} (+${tempHp})`;
+                } else {
+                    hpBarText.textContent = `${currentHp}/${maxHp}`;
+                }
 
                 // 根据血量百分比更新颜色
                 if (hpPercentage > 50) {
-                    hpBarFill.style.backgroundColor = "#4CAF50"; // 绿色
+                    hpBarFill.style.backgroundColor = "var(--green)"; // 绿色
                 } else if (hpPercentage > 20) {
-                    hpBarFill.style.backgroundColor = "#FFC107"; // 黄色
+                    hpBarFill.style.backgroundColor = "var(--yellow)"; // 黄色
                 } else {
-                    hpBarFill.style.backgroundColor = "#F44336"; // 红色
+                    hpBarFill.style.backgroundColor = "var(--orange)"; // 橙色
                 }
 
                 // 更新状态徽章
@@ -481,20 +1155,40 @@
                 const value = parseInt(damageInput.value) || 0;
                 if (value <= 0) return;
 
-                const currentHpDisplay = monsterCard.querySelector(".current-hp");
-                const maxHpDisplay = monsterCard.querySelector(".max-hp");
+                const currentHpInput = monsterCard.querySelector(".current-hp-input");
+                const maxHpInput = monsterCard.querySelector(".max-hp-input");
+                const tempHpInput = monsterCard.querySelector(".temp-hp-input");
                 
-                let currentHp = parseInt(currentHpDisplay.textContent);
-                const maxHp = parseInt(maxHpDisplay.textContent);
+                let currentHp = parseInt(currentHpInput.value) || 0;
+                const maxHp = parseInt(maxHpInput.value) || 1;
+                let tempHp = parseInt(tempHpInput.value) || 0;
 
                 if (isDamage) {
-                    currentHp = Math.max(0, currentHp - value);
+                    // 先消耗临时生命值
+                    if (tempHp > 0) {
+                        if (tempHp >= value) {
+                            tempHp -= value;
+                            tempHpInput.value = tempHp;
+                        } else {
+                            // 部分伤害被临时HP吸收，剩余伤害扣除实际HP
+                            const remainingDamage = value - tempHp;
+                            tempHp = 0;
+                            tempHpInput.value = 0;
+                            currentHp = Math.max(0, currentHp - remainingDamage);
+                            currentHpInput.value = currentHp;
+                        }
+                    } else {
+                        // 没有临时HP，直接扣除实际HP
+                        currentHp = Math.max(0, currentHp - value);
+                        currentHpInput.value = currentHp;
+                    }
                 } else {
+                    // 治疗只增加实际生命值，不增加临时生命值
                     currentHp = Math.min(maxHp, currentHp + value);
+                    currentHpInput.value = currentHp;
                 }
 
-                currentHpDisplay.textContent = currentHp;
-                updateHpBar(monsterCard, currentHp, maxHp);
+                updateHpBar(monsterCard);
                 damageInput.value = "";
                 damageInput.focus();
             }
@@ -502,40 +1196,228 @@
             function showEmptyState() {
                 const emptyState = document.createElement("div");
                 emptyState.className = "empty-state";
-                emptyState.textContent = "点击上方按钮添加怪物";
+                emptyState.textContent = "点击上方按钮添加怪物或冒险者";
                 monsterContainer.appendChild(emptyState);
             }
+            
+            // 状态选择器相关函数
+            function openStatusSelector(card) {
+                currentCardForStatus = card;
+                
+                // 清空状态面板
+                conditionsGrid.innerHTML = "";
+                
+                // 获取当前卡片的状态
+                const currentConditions = JSON.parse(card.dataset.conditions || "[]");
+                
+                // 添加所有状态选项
+                conditions.forEach(condition => {
+                    addConditionToGrid(condition, currentConditions.some(id => id === condition.id));
+                });
+                
+                // 添加自定义状态
+                const customStates = Array.from(document.querySelectorAll(`.condition-tag.custom[data-card-id="${card.dataset.id}"]`));
+                customStates.forEach(stateEl => {
+                    const id = stateEl.dataset.id;
+                    const name = stateEl.textContent;
+                    const desc = stateEl.title || '';
+                    
+                    if (!conditionsGrid.querySelector(`[data-id="${id}"]`)) {
+                        addConditionToGrid({ id, name, desc, custom: true }, true);
+                    }
+                });
+                
+                // 清空自定义状态输入
+                customStatusName.value = "";
+                customStatusDesc.value = "";
+                
+                // 显示状态选择器
+                statusSelector.classList.add("active");
+            }
+            
+            function addConditionToGrid(condition, isSelected = false) {
+                const conditionEl = document.createElement("div");
+                conditionEl.className = `condition-item ${isSelected ? "selected" : ""} ${condition.custom ? "custom-condition" : ""}`;
+                conditionEl.dataset.id = condition.id;
+                
+                conditionEl.innerHTML = `
+                    <div class="condition-name">
+                        ${condition.name}
+                        <span>${isSelected ? "✓" : ""}</span>
+                    </div>
+                    <div class="condition-desc">${condition.desc || ''}</div>
+                `;
+                
+                conditionEl.addEventListener("click", () => {
+                    conditionEl.classList.toggle("selected");
+                    const checkmark = conditionEl.querySelector(".condition-name span");
+                    if (conditionEl.classList.contains("selected")) {
+                        checkmark.textContent = "✓";
+                    } else {
+                        checkmark.textContent = "";
+                    }
+                });
+                
+                conditionsGrid.appendChild(conditionEl);
+            }
+            
+            function closeStatusSelector() {
+                statusSelector.classList.remove("active");
+                currentCardForStatus = null;
+            }
+            
+            function applySelectedStatus() {
+                if (!currentCardForStatus) return;
+                
+                // 获取所有选中的状态
+                const selectedItems = conditionsGrid.querySelectorAll(".condition-item.selected");
+                const selectedConditions = Array.from(selectedItems).map(item => ({
+                    id: item.dataset.id,
+                    name: item.querySelector(".condition-name").textContent.trim().replace('✓', '').trim(),
+                    desc: item.querySelector(".condition-desc").textContent,
+                    custom: item.classList.contains("custom-condition")
+                }));
+                
+                // 更新卡片的状态数据
+                currentCardForStatus.dataset.conditions = JSON.stringify(selectedConditions.map(c => c.id));
+                
+                // 更新卡片上的状态标签
+                updateConditionTags(currentCardForStatus, selectedConditions);
+                
+                // 关闭选择器
+                closeStatusSelector();
+            }
+            
+            function updateConditionTags(card, conditions) {
+                const tagsContainer = card.querySelector(".tags-container");
+                
+                // 移除除了状态徽章外的所有标签
+                Array.from(tagsContainer.children).forEach(child => {
+                    if (!child.classList.contains("status-badge")) {
+                        child.remove();
+                    }
+                });
+                
+                // 添加选中的状态标签
+                conditions.forEach(condition => {
+                    const tag = document.createElement("span");
+                    tag.className = condition.custom ? "condition-tag custom" : "condition-tag";
+                    tag.dataset.id = condition.id;
+                    tag.dataset.cardId = card.dataset.id;
+                    tag.textContent = condition.name;
+                    tag.title = condition.desc || '';
+                    tagsContainer.appendChild(tag);
+                });
+            }
 
-            // 添加单个怪物按钮事件
+            // 拖拽相关函数
+            function handleDragStart(e) {
+                this.style.opacity = '0.4';
+                dragSrcEl = this;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', this.innerHTML);
+            }
+
+            function handleDragOver(e) {
+                if (e.preventDefault) {
+                    e.preventDefault(); // 允许放置
+                }
+                e.dataTransfer.dropEffect = 'move';
+                return false;
+            }
+
+            function handleDragEnter() {
+                this.classList.add('drag-over');
+            }
+
+            function handleDragLeave() {
+                this.classList.remove('drag-over');
+            }
+
+            function handleDrop(e) {
+                if (e.stopPropagation) {
+                    e.stopPropagation(); // 阻止某些浏览器的重定向
+                }
+                
+                // 只有在不同卡片之间才进行交换
+                if (dragSrcEl !== this) {
+                    // 确定目标位置
+                    const container = monsterContainer;
+                    const cards = Array.from(container.querySelectorAll('.monster-card'));
+                    const srcIndex = cards.indexOf(dragSrcEl);
+                    const destIndex = cards.indexOf(this);
+                    
+                    // 移动元素
+                    if (srcIndex < destIndex) {
+                        container.insertBefore(dragSrcEl, this.nextSibling);
+                    } else {
+                        container.insertBefore(dragSrcEl, this);
+                    }
+                }
+                
+                return false;
+            }
+
+            function handleDragEnd() {
+                this.style.opacity = '1';
+                
+                const cards = document.querySelectorAll('.monster-card');
+                cards.forEach(card => {
+                    card.classList.remove('drag-over');
+                });
+            }
+
+            // 添加怪物按钮事件
             addMonsterBtn.addEventListener("click", () => {
                 const name = `${monsterNamePrefix.value} ${monsterCounter++}`;
                 const maxHp = parseInt(defaultHpInput.value) || 100;
-                const newMonsterCard = createMonsterCard(name, maxHp);
+                const newMonsterCard = createMonsterCard(name, maxHp, false);
                 monsterContainer.appendChild(newMonsterCard);
             });
 
-            // 批量添加怪物按钮事件
-            addMultipleBtn.addEventListener("click", () => {
-                const count = parseInt(monsterCountInput.value) || 4;
-                const limitedCount = Math.min(Math.max(count, 1), 20); // 限制在1-20之间
+            // 添加冒险者按钮事件
+            addAdventurerBtn.addEventListener("click", () => {
+                const name = `${adventurerNamePrefix.value} ${adventurerCounter++}`;
                 const maxHp = parseInt(defaultHpInput.value) || 100;
-                const fragment = document.createDocumentFragment();
-                
-                for (let i = 0; i < limitedCount; i++) {
-                    const name = `${monsterNamePrefix.value} ${monsterCounter++}`;
-                    const newMonsterCard = createMonsterCard(name, maxHp);
-                    fragment.appendChild(newMonsterCard);
-                }
-                
-                monsterContainer.appendChild(fragment);
+                const newMonsterCard = createMonsterCard(name, maxHp, true);
+                monsterContainer.appendChild(newMonsterCard);
             });
 
-            // 重置所有按钮事件
+            // 重置所有按钮事件 - 现在会排除锁定的卡片
             resetAllBtn.addEventListener("click", () => {
-                if (confirm("确定要移除所有怪物吗？")) {
-                    monsterContainer.innerHTML = "";
-                    monsterCounter = 1;
-                    showEmptyState();
+                if (confirm("确定要移除所有非锁定的怪物和冒险者吗？")) {
+                    const cards = document.querySelectorAll('.monster-card:not(.locked)');
+                    cards.forEach(card => card.remove());
+                    
+                    // 如果没有卡片了，显示空状态提示
+                    if (monsterContainer.children.length === 0) {
+                        showEmptyState();
+                    }
+                }
+            });
+            
+            // 状态选择器事件
+            closeStatusBtn.addEventListener("click", closeStatusSelector);
+            cancelStatusBtn.addEventListener("click", closeStatusSelector);
+            applyStatusBtn.addEventListener("click", applySelectedStatus);
+            
+            // 点击状态选择器外部关闭
+            statusSelector.addEventListener("click", (e) => {
+                if (e.target === statusSelector) {
+                    closeStatusSelector();
+                }
+            });
+            
+            // 添加自定义状态的Enter键支持
+            customStatusName.addEventListener("keypress", (e) => {
+                if (e.key === "Enter") {
+                    customStatusDesc.focus();
+                }
+            });
+            
+            customStatusDesc.addEventListener("keypress", (e) => {
+                if (e.key === "Enter") {
+                    addCustomStatusBtn.click();
                 }
             });
         });

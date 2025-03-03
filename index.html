@@ -1049,10 +1049,13 @@
 
             // 会话ID处理
             let sessionId = new URLSearchParams(window.location.search).get('session');
-            if (!sessionId) {
-                sessionId = Math.random().toString(36).substring(2, 12);
-                window.history.pushState({}, '', `?session=${sessionId}`);
-            }
+if (!sessionId) {
+    // 增强随机性，确保在隐私模式下也能正常工作
+    const randomPart = Math.random().toString(36).substring(2, 12);
+    const timestampPart = Date.now().toString(36);
+    sessionId = randomPart + timestampPart;
+    window.history.pushState({}, '', `?session=${sessionId}`);
+}
             console.log("当前会话ID:", sessionId);
 
             const sessionInfoDiv = document.createElement("div");
@@ -1096,7 +1099,12 @@
 
             // 初始化应用
             function initializeApp() {
-                console.log("初始化应用...");
+    console.log("初始化应用...");
+    
+    // 添加简单的安全检查
+    if (window.location.protocol !== 'https:' && !window.location.hostname.includes('localhost')) {
+        console.warn('警告: 应用未在HTTPS下运行，这可能导致安全问题');
+    }
                 setButtonsEnabled(false);
                 showLoadingState("正在连接到服务器...");
                 updateSyncStatus("connecting", "正在连接");
@@ -1873,16 +1881,17 @@
 
             // 离线支持
             function setupOfflineSupport() {
-                console.log("设置离线支持...");
-                try {
-                    database.goOnline();
-                    firebase.database().setPersistenceEnabled(true)
-                        .then(() => console.log("Firebase持久化已启用"))
-                        .catch(err => console.log("设置持久化失败:", err));
-                } catch (e) {
-                    console.error("设置离线支持时出错:", e);
-                }
-            }
+    console.log("设置离线支持...");
+    try {
+        database.goOnline();
+        // Firebase 9 兼容模式下正确设置持久化方式
+        firebase.database.enablePersistence()
+            .then(() => console.log("Firebase持久化已启用"))
+            .catch(err => console.log("设置持久化失败:", err));
+    } catch (e) {
+        console.error("设置离线支持时出错:", e);
+    }
+}
 
             // 网络状态监听
             window.addEventListener('online', () => {
@@ -1919,10 +1928,6 @@
                             conditions: card.dataset.conditions || '[]',
                             isLocked: card.classList.contains('locked')
                         }));
-                        if (navigator.sendBeacon) {
-                            const data = new Blob([JSON.stringify({ sessionId, monsters: monsterCards, lastUpdated: Date.now() })], { type: 'application/json' });
-                            navigator.sendBeacon('https://example.com/save', data);
-                        }
                     } catch (e) {
                         console.error('页面卸载前保存失败:', e);
                     }

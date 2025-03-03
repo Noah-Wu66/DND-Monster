@@ -9,8 +9,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <!-- 添加Socket.io客户端库 -->
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
 
     <!-- 样式定义 -->
     <style>
@@ -990,8 +990,7 @@
                 </div>
             </div>
         </div>
-
-        <!-- 怪物网格 -->
+<!-- 怪物网格 -->
         <div id="monster-container" class="monster-grid">
             <div class="empty-state">点击上方按钮添加怪物或冒险者</div>
         </div>
@@ -1034,30 +1033,22 @@
     <!-- JavaScript逻辑 -->
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            // Firebase 配置
-            const firebaseConfig = {
-                apiKey: "AIzaSyAkzZRKbtnKtnriA1j36rKzl0cvHpc4ZAQ",
-                authDomain: "dnd-battle-1bba4.firebaseapp.com",
-                databaseURL: "https://dnd-battle-1bba4-default-rtdb.firebaseio.com",
-                projectId: "dnd-battle-1bba4",
-                storageBucket: "dnd-battle-1bba4.firebasestorage.app",
-                messagingSenderId: "678762129486",
-                appId: "1:678762129486:web:7013cedb49185bd21a7b1f"
-            };
-            firebase.initializeApp(firebaseConfig);
-            const database = firebase.database();
-
+            // 后端API服务和WebSocket URL
+            const API_URL = 'https://您的API服务URL/api/v1/battles';
+            const SOCKET_URL = 'https://您的API服务URL';
+            
             // 会话ID处理
             let sessionId = new URLSearchParams(window.location.search).get('session');
-if (!sessionId) {
-    // 增强随机性，确保在隐私模式下也能正常工作
-    const randomPart = Math.random().toString(36).substring(2, 12);
-    const timestampPart = Date.now().toString(36);
-    sessionId = randomPart + timestampPart;
-    window.history.pushState({}, '', `?session=${sessionId}`);
-}
+            if (!sessionId) {
+                // 增强随机性，确保在隐私模式下也能正常工作
+                const randomPart = Math.random().toString(36).substring(2, 12);
+                const timestampPart = Date.now().toString(36);
+                sessionId = randomPart + timestampPart;
+                window.history.pushState({}, '', `?session=${sessionId}`);
+            }
             console.log("当前会话ID:", sessionId);
 
+            // 显示会话ID
             const sessionInfoDiv = document.createElement("div");
             sessionInfoDiv.id = "session-info";
             sessionInfoDiv.innerHTML = `
@@ -1068,7 +1059,8 @@ if (!sessionId) {
             title.parentNode.insertBefore(sessionInfoDiv, title.nextSibling);
 
             // 全局变量
-            let isConnectedToFirebase = false;
+            let socket = null;
+            let isConnected = false;
             let isLoadingData = false;
             let lastSaveTime = 0;
             let pendingSaveTimer = null;
@@ -1097,36 +1089,64 @@ if (!sessionId) {
             const customStatusDesc = document.getElementById("custom-status-desc");
             const addCustomStatusBtn = document.getElementById("add-custom-status");
 
+            // 初始化Socket.io连接
+            function initSocketConnection() {
+                socket = io(SOCKET_URL);
+                
+                socket.on('connect', () => {
+                    console.log('已连接到服务器');
+                    isConnected = true;
+                    updateSyncStatus("success", "已连接");
+                    setButtonsEnabled(true);
+                    
+                    // 加入会话
+                    socket.emit('join-session', sessionId);
+                });
+                
+                socket.on('disconnect', () => {
+                    console.log('与服务器断开连接');
+                    isConnected = false;
+                    updateSyncStatus("error", "未连接");
+                    setButtonsEnabled(false);
+                    showConnectionError();
+                });
+                
+                socket.on('monster-updated', (monsterData) => {
+                    if (!isLoadingData && monsterData) {
+                        console.log("收到怪物更新:", monsterData.id);
+                        createCardFromData(monsterData);
+                    }
+                });
+                
+                socket.on('session-updated', (data) => {
+                    if (!isLoadingData && data) {
+                        console.log("收到会话更新");
+                        refreshUIFromData(data);
+                    }
+                });
+            }
+
             // 初始化应用
             function initializeApp() {
-    console.log("初始化应用...");
-    
-    // 添加简单的安全检查
-    if (window.location.protocol !== 'https:' && !window.location.hostname.includes('localhost')) {
-        console.warn('警告: 应用未在HTTPS下运行，这可能导致安全问题');
-    }
+                console.log("初始化应用...");
+                
+                // 添加简单的安全检查
+                if (window.location.protocol !== 'https:' && !window.location.hostname.includes('localhost')) {
+                    console.warn('警告: 应用未在HTTPS下运行，这可能导致安全问题');
+                }
+                
                 setButtonsEnabled(false);
                 showLoadingState("正在连接到服务器...");
                 updateSyncStatus("connecting", "正在连接");
-
-                const connectedRef = database.ref(".info/connected");
-                connectedRef.on("value", (snap) => {
-                    if (snap.val() === true) {
-                        console.log("已连接到Firebase");
-                        isConnectedToFirebase = true;
-                        updateSyncStatus("success", "已连接");
-                        setButtonsEnabled(true);
-                        loadFromFirebase(true);
-                        setupRealtimeSync();
-                        setupCopySessionLink();
-                    } else {
-                        console.log("未连接到Firebase");
-                        isConnectedToFirebase = false;
-                        updateSyncStatus("error", "未连接");
-                        hideLoadingState();
-                        showConnectionError();
-                    }
-                });
+                
+                // 初始化Socket连接
+                initSocketConnection();
+                
+                // 加载初始数据
+                loadFromServer(true);
+                
+                // 设置复制会话链接
+                setupCopySessionLink();
             }
 
             // 加载状态显示
@@ -1175,7 +1195,7 @@ if (!sessionId) {
                 document.querySelector('.container').appendChild(errorDiv);
                 document.getElementById("retry-loading-btn").addEventListener("click", () => {
                     errorDiv.remove();
-                    loadFromFirebase(true);
+                    loadFromServer(true);
                 });
             }
 
@@ -1191,7 +1211,7 @@ if (!sessionId) {
                 document.querySelector('.container').appendChild(errorDiv);
                 document.getElementById("retry-save-btn").addEventListener("click", () => {
                     errorDiv.remove();
-                    saveToFirebase();
+                    saveToServer();
                 });
                 setTimeout(() => {
                     if (document.getElementById("save-error")) document.getElementById("save-error").remove();
@@ -1203,9 +1223,152 @@ if (!sessionId) {
                 errors.forEach(error => error.remove());
             }
 
+            // 从服务器加载数据
+            function loadFromServer(isInitialLoad = false) {
+                if (isLoadingData) return;
+                isLoadingData = true;
+                
+                if (isInitialLoad) {
+                    showLoadingState("正在加载战斗数据...");
+                    updateSyncStatus("syncing", "正在加载数据");
+                }
+                console.log("正在加载会话数据...");
+                
+                fetch(`${API_URL}/sessions/${sessionId}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP错误! 状态: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(result => {
+                        if (result.success && result.data) {
+                            console.log("加载到数据:", result.data);
+                            refreshUIFromData(result.data);
+                        } else {
+                            console.log("没有找到会话数据或数据为空");
+                            showEmptyState();
+                        }
+                        isLoadingData = false;
+                        hideLoadingState();
+                        updateSyncStatus("success", "数据已加载");
+                    })
+                    .catch(error => {
+                        console.error("加载数据出错:", error);
+                        isLoadingData = false;
+                        hideLoadingState();
+                        updateSyncStatus("error", "加载失败");
+                        if (isInitialLoad) showLoadingError(error);
+                    });
+            }
+
+            // 更新UI显示从服务器获取的数据
+            function refreshUIFromData(data) {
+                if (data && data.monsters) {
+                    monsterContainer.innerHTML = '';
+                    let maxMonsterNumber = 0;
+                    let maxAdventurerNumber = 0;
+                    
+                    const monstersArray = Object.values(data.monsters);
+                    if (monstersArray.length > 0) {
+                        monstersArray.forEach(monsterData => {
+                            if (monsterData.type === 'monster') {
+                                const num = parseInt(monsterData.name.match(/\d+$/)?.[0] || 0);
+                                maxMonsterNumber = Math.max(maxMonsterNumber, num);
+                            } else if (monsterData.type === 'adventurer') {
+                                const num = parseInt(monsterData.name.match(/\d+$/)?.[0] || 0);
+                                maxAdventurerNumber = Math.max(maxAdventurerNumber, num);
+                            }
+                            createCardFromData(monsterData);
+                        });
+                        monsterCounter = maxMonsterNumber + 1;
+                        adventurerCounter = maxAdventurerNumber + 1;
+                    } else {
+                        showEmptyState();
+                    }
+                } else {
+                    showEmptyState();
+                }
+            }
+
+            // 保存数据到服务器
+            function saveToServer(immediate = false) {
+                if (isLoadingData || !isConnected) return;
+                
+                if (pendingSaveTimer) {
+                    clearTimeout(pendingSaveTimer);
+                    pendingSaveTimer = null;
+                }
+                
+                if (!immediate) {
+                    pendingSaveTimer = setTimeout(() => saveToServer(true), 500);
+                    return;
+                }
+                
+                updateSyncStatus("syncing", "正在保存...");
+                console.log("正在保存会话数据...");
+                
+                // 收集所有怪物数据
+                const monstersMap = {};
+                document.querySelectorAll('.monster-card').forEach(card => {
+                    const monsterId = card.dataset.id;
+                    const monsterData = {
+                        id: monsterId,
+                        type: card.dataset.type,
+                        name: card.querySelector('.monster-name').textContent,
+                        currentHp: card.querySelector('.current-hp-input').value,
+                        maxHp: card.querySelector('.max-hp-input').value,
+                        tempHp: card.querySelector('.temp-hp-input').value || 0,
+                        conditions: card.dataset.conditions || '[]',
+                        isLocked: card.classList.contains('locked')
+                    };
+                    
+                    monstersMap[monsterId] = monsterData;
+                    
+                    // 通知其他客户端单个怪物更新
+                    if (socket && socket.connected) {
+                        socket.emit('update-monster', {
+                            sessionId: sessionId,
+                            monster: monsterData
+                        });
+                    }
+                });
+                
+                const saveTime = Date.now();
+                lastSaveTime = saveTime;
+                
+                // 保存整个会话数据
+                fetch(`${API_URL}/sessions/${sessionId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ monsters: monstersMap })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP错误! 状态: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(result => {
+                    if (saveTime === lastSaveTime) {
+                        if (result.success) {
+                            console.log("数据保存成功");
+                            updateSyncStatus("success", "已保存");
+                        } else {
+                            console.error("保存失败:", result.error);
+                            updateSyncStatus("error", "保存失败");
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error("保存数据出错:", error);
+                    updateSyncStatus("error", "保存失败");
+                    showSaveError(error);
+                });
+            }
+
             // 按钮状态控制
             function setButtonsEnabled(enabled) {
-                addMonsterBtn.disabled = !enabled;
                 addAdventurerBtn.disabled = !enabled;
                 resetAllBtn.disabled = !enabled;
                 manualSyncBtn.disabled = !enabled;
@@ -1239,60 +1402,6 @@ if (!sessionId) {
                             prompt("请手动复制以下链接:", sessionLink);
                         });
                 });
-            }
-
-            // 从Firebase加载数据
-            function loadFromFirebase(isInitialLoad = false) {
-                if (isLoadingData) return;
-                isLoadingData = true;
-                const loadOperation = () => {
-                    return new Promise((resolve, reject) => {
-                        const sessionRef = database.ref('sessions/' + sessionId);
-                        sessionRef.once('value').then(snapshot => resolve(snapshot.val())).catch(reject);
-                    });
-                };
-
-                if (isInitialLoad) {
-                    showLoadingState("正在加载战斗数据...");
-                    updateSyncStatus("syncing", "正在加载数据");
-                }
-                console.log("正在加载会话数据...");
-
-                retryOperation(loadOperation)
-                    .then(data => {
-                        if (data && data.monsters) {
-                            console.log("加载到", Object.keys(data.monsters).length, "个怪物/冒险者");
-                            monsterContainer.innerHTML = '';
-                            let maxMonsterNumber = 0;
-                            let maxAdventurerNumber = 0;
-                            const monstersArray = Array.isArray(data.monsters) ? data.monsters : Object.values(data.monsters);
-                            monstersArray.forEach(monsterData => {
-                                if (monsterData.type === 'monster') {
-                                    const num = parseInt(monsterData.name.match(/\d+$/)?.[0] || 0);
-                                    maxMonsterNumber = Math.max(maxMonsterNumber, num);
-                                } else if (monsterData.type === 'adventurer') {
-                                    const num = parseInt(monsterData.name.match(/\d+$/)?.[0] || 0);
-                                    maxAdventurerNumber = Math.max(maxAdventurerNumber, num);
-                                }
-                                createCardFromData(monsterData);
-                            });
-                            monsterCounter = maxMonsterNumber + 1;
-                            adventurerCounter = maxAdventurerNumber + 1;
-                        } else {
-                            console.log("没有找到会话数据或数据为空");
-                            showEmptyState();
-                        }
-                        isLoadingData = false;
-                        hideLoadingState();
-                        updateSyncStatus("success", "数据已加载");
-                    })
-                    .catch(error => {
-                        console.error("加载数据出错:", error);
-                        isLoadingData = false;
-                        hideLoadingState();
-                        updateSyncStatus("error", "加载失败");
-                        if (isInitialLoad) showLoadingError(error);
-                    });
             }
 
             // 创建和更新卡片
@@ -1352,99 +1461,6 @@ if (!sessionId) {
                     card.remove();
                     if (!monsterContainer.querySelectorAll('.monster-card').length) showEmptyState();
                 }
-            }
-
-            // 保存到Firebase
-            function saveToFirebase(immediate = false) {
-                if (isLoadingData || !isConnectedToFirebase) return;
-                if (pendingSaveTimer) {
-                    clearTimeout(pendingSaveTimer);
-                    pendingSaveTimer = null;
-                }
-                if (!immediate) {
-                    pendingSaveTimer = setTimeout(() => saveToFirebase(true), 500);
-                    return;
-                }
-
-                updateSyncStatus("syncing", "正在保存...");
-                console.log("正在保存会话数据...");
-                const saveOperation = () => {
-                    return new Promise((resolve, reject) => {
-                        const monstersMap = {};
-                        document.querySelectorAll('.monster-card').forEach(card => {
-                            const monsterId = card.dataset.id;
-                            monstersMap[monsterId] = {
-                                id: monsterId,
-                                type: card.dataset.type,
-                                name: card.querySelector('.monster-name').textContent,
-                                currentHp: card.querySelector('.current-hp-input').value,
-                                maxHp: card.querySelector('.max-hp-input').value,
-                                tempHp: card.querySelector('.temp-hp-input').value || 0,
-                                conditions: card.dataset.conditions || '[]',
-                                isLocked: card.classList.contains('locked')
-                            };
-                        });
-                        const saveTime = Date.now();
-                        lastSaveTime = saveTime;
-                        database.ref('sessions/' + sessionId).set({
-                            monsters: monstersMap,
-                            lastUpdated: firebase.database.ServerValue.TIMESTAMP
-                        }).then(() => {
-                            if (saveTime === lastSaveTime) resolve();
-                        }).catch(reject);
-                    });
-                };
-
-                retryOperation(saveOperation)
-                    .then(() => {
-                        console.log("数据保存成功");
-                        updateSyncStatus("success", "已保存");
-                    })
-                    .catch(error => {
-                        console.error("保存数据出错:", error);
-                        updateSyncStatus("error", "保存失败");
-                        showSaveError(error);
-                    });
-            }
-
-            // 实时同步设置
-            function setupRealtimeSync() {
-                console.log("设置实时同步...");
-                const sessionRef = database.ref('sessions/' + sessionId);
-                sessionRef.off();
-                sessionRef.child('monsters').on('child_changed', (snapshot) => {
-                    if (!isLoadingData) {
-                        console.log("收到单个怪物更新:", snapshot.key);
-                        const changedMonster = snapshot.val();
-                        if (changedMonster?.id) createCardFromData(changedMonster);
-                    }
-                });
-                sessionRef.child('monsters').on('child_added', (snapshot) => {
-                    if (!isLoadingData) {
-                        console.log("收到新怪物:", snapshot.key);
-                        const newMonster = snapshot.val();
-                        if (newMonster?.id && !document.querySelector(`.monster-card[data-id="${newMonster.id}"]`)) {
-                            createCardFromData(newMonster);
-                        }
-                    }
-                });
-                sessionRef.child('monsters').on('child_removed', (snapshot) => {
-                    if (!isLoadingData) {
-                        console.log("收到怪物移除:", snapshot.key);
-                        const removedMonster = snapshot.val();
-                        if (removedMonster?.id) removeMonsterById(removedMonster.id);
-                    }
-                });
-                sessionRef.on('cancel', (error) => {
-                    console.error("实时同步取消:", error);
-                    updateSyncStatus("error", "同步中断");
-                    setTimeout(() => {
-                        if (isConnectedToFirebase) {
-                            console.log("尝试重新建立实时同步...");
-                            setupRealtimeSync();
-                        }
-                    }, 5000);
-                });
             }
 
             // 状态定义
@@ -1524,7 +1540,7 @@ if (!sessionId) {
                     e.stopPropagation();
                     monsterCard.remove();
                     if (!monsterContainer.children.length) showEmptyState();
-                    saveToFirebase();
+                    saveToServer();
                 });
 
                 const lockButton = monsterCard.querySelector(".lock-button");
@@ -1533,7 +1549,7 @@ if (!sessionId) {
                     monsterCard.classList.toggle("locked");
                     lockButton.textContent = monsterCard.classList.contains("locked") ? "🔒" : "🔓";
                     lockButton.title = monsterCard.classList.contains("locked") ? "解锁卡片" : "锁定卡片";
-                    saveToFirebase();
+                    saveToServer();
                 });
 
                 const statusButton = monsterCard.querySelector(".status-button");
@@ -1549,7 +1565,7 @@ if (!sessionId) {
                     newCurrentHp = Math.max(0, Math.min(maxHp, newCurrentHp));
                     currentHpInput.value = newCurrentHp;
                     updateHpBar(monsterCard);
-                    saveToFirebase();
+                    saveToServer();
                 });
 
                 const maxHpInput = monsterCard.querySelector(".max-hp-input");
@@ -1560,7 +1576,7 @@ if (!sessionId) {
                     let currentHp = parseInt(currentHpInput.value) || 0;
                     if (currentHp > newMaxHp) currentHpInput.value = currentHp = newMaxHp;
                     updateHpBar(monsterCard);
-                    saveToFirebase();
+                    saveToServer();
                 });
 
                 const tempHpInput = monsterCard.querySelector(".temp-hp-input");
@@ -1568,7 +1584,7 @@ if (!sessionId) {
                     let newTempHp = Math.max(0, parseInt(tempHpInput.value) || 0);
                     tempHpInput.value = newTempHp;
                     updateHpBar(monsterCard);
-                    saveToFirebase();
+                    saveToServer();
                 });
 
                 const damageBtn = monsterCard.querySelector(".damage-btn");
@@ -1583,7 +1599,7 @@ if (!sessionId) {
                 });
 
                 const monsterName = monsterCard.querySelector(".monster-name");
-                monsterName.addEventListener("blur", saveToFirebase);
+                monsterName.addEventListener("blur", saveToServer);
                 monsterName.addEventListener("mousedown", (e) => e.stopPropagation());
 
                 monsterCard.addEventListener("dragstart", handleDragStart);
@@ -1658,7 +1674,7 @@ if (!sessionId) {
                 updateHpBar(monsterCard);
                 damageInput.value = "";
                 damageInput.focus();
-                saveToFirebase();
+                saveToServer();
             }
 
             // 显示空状态
@@ -1725,7 +1741,7 @@ if (!sessionId) {
                 currentCardForStatus.dataset.conditions = JSON.stringify(selectedConditions.map(c => c.id));
                 updateConditionTags(currentCardForStatus, selectedConditions);
                 closeStatusSelector();
-                saveToFirebase();
+                saveToServer();
             }
 
             function updateConditionTags(card, conditionObjects) {
@@ -1785,7 +1801,7 @@ if (!sessionId) {
                     } else {
                         monsterContainer.insertBefore(dragSrcEl, this);
                     }
-                    saveToFirebase();
+                    saveToServer();
                 }
                 return false;
             }
@@ -1797,37 +1813,37 @@ if (!sessionId) {
 
             // 事件监听
             addMonsterBtn.addEventListener("click", () => {
-                if (!isConnectedToFirebase) return alert("未连接到服务器，请检查网络连接并刷新页面");
+                if (!isConnected) return alert("未连接到服务器，请检查网络连接并刷新页面");
                 const name = `${monsterNamePrefix.value} ${monsterCounter++}`;
                 const maxHp = parseInt(defaultHpInput.value) || 100;
                 monsterContainer.appendChild(createMonsterCard(name, maxHp, false));
-                saveToFirebase();
+                saveToServer();
             });
 
             addAdventurerBtn.addEventListener("click", () => {
-                if (!isConnectedToFirebase) return alert("未连接到服务器，请检查网络连接并刷新页面");
+                if (!isConnected) return alert("未连接到服务器，请检查网络连接并刷新页面");
                 const name = `${adventurerNamePrefix.value} ${adventurerCounter++}`;
                 const maxHp = parseInt(defaultHpInput.value) || 100;
                 monsterContainer.appendChild(createMonsterCard(name, maxHp, true));
-                saveToFirebase();
+                saveToServer();
             });
 
             resetAllBtn.addEventListener("click", () => {
-                if (!isConnectedToFirebase) return alert("未连接到服务器，请检查网络连接并刷新页面");
+                if (!isConnected) return alert("未连接到服务器，请检查网络连接并刷新页面");
                 if (confirm("确定要移除所有非锁定的怪物和冒险者吗？")) {
                     document.querySelectorAll('.monster-card:not(.locked)').forEach(card => card.remove());
-                    if (!monsterContainer.children.length) showEmptyState();
-                    saveToFirebase();
+                    if (!monsterContainer.querySelectorAll('.monster-card').length) showEmptyState();
+                    saveToServer();
                 }
             });
 
             manualSyncBtn.addEventListener("click", () => {
-                if (!isConnectedToFirebase) return alert("未连接到服务器，请检查网络连接并刷新页面");
+                if (!isConnected) return alert("未连接到服务器，请检查网络连接并刷新页面");
                 manualSyncBtn.classList.add("syncing");
                 updateSyncStatus("syncing", "手动同步中...");
-                saveToFirebase(true);
+                saveToServer(true);
                 setTimeout(() => {
-                    loadFromFirebase();
+                    loadFromServer();
                     setTimeout(() => manualSyncBtn.classList.remove("syncing"), 1000);
                 }, 1000);
             });
@@ -1858,45 +1874,10 @@ if (!sessionId) {
                 if (e.key === "Enter") addCustomStatusBtn.click();
             });
 
-            // 重试机制
-            let retryCount = 0;
-            const MAX_RETRIES = 3;
-            function retryOperation(operation, delay = 2000) {
-                return new Promise((resolve, reject) => {
-                    operation()
-                        .then(resolve)
-                        .catch(error => {
-                            console.log(`操作失败，正在重试 (${retryCount + 1}/${MAX_RETRIES})...`);
-                            if (retryCount >= MAX_RETRIES - 1) {
-                                console.error(`已达到最大重试次数(${MAX_RETRIES})，操作失败`);
-                                retryCount = 0;
-                                reject(error);
-                                return;
-                            }
-                            retryCount++;
-                            setTimeout(() => retryOperation(operation, delay * 1.5).then(resolve).catch(reject), delay);
-                        });
-                });
-            }
-
-            // 离线支持
-            function setupOfflineSupport() {
-    console.log("设置离线支持...");
-    try {
-        database.goOnline();
-        // Firebase 9 兼容模式下正确设置持久化方式
-        firebase.database.enablePersistence()
-            .then(() => console.log("Firebase持久化已启用"))
-            .catch(err => console.log("设置持久化失败:", err));
-    } catch (e) {
-        console.error("设置离线支持时出错:", e);
-    }
-}
-
             // 网络状态监听
             window.addEventListener('online', () => {
                 console.log('网络已连接');
-                if (!isConnectedToFirebase) {
+                if (!isConnected) {
                     updateSyncStatus("syncing", "重新连接中...");
                     setTimeout(() => initializeApp(), 1000);
                 }
@@ -1905,32 +1886,14 @@ if (!sessionId) {
             window.addEventListener('offline', () => {
                 console.log('网络连接已断开');
                 updateSyncStatus("error", "网络已断开");
-                isConnectedToFirebase = false;
+                isConnected = false;
+                setButtonsEnabled(false);
             });
 
             document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible' && isConnectedToFirebase) {
+                if (document.visibilityState === 'visible' && isConnected) {
                     console.log('页面恢复前台，检查连接状态');
-                    loadFromFirebase();
-                }
-            });
-
-            window.addEventListener('beforeunload', () => {
-                if (isConnectedToFirebase && !isLoadingData) {
-                    try {
-                        const monsterCards = Array.from(document.querySelectorAll('.monster-card')).map(card => ({
-                            id: card.dataset.id,
-                            type: card.dataset.type,
-                            name: card.querySelector('.monster-name').textContent,
-                            currentHp: card.querySelector('.current-hp-input').value,
-                            maxHp: card.querySelector('.max-hp-input').value,
-                            tempHp: card.querySelector('.temp-hp-input').value || 0,
-                            conditions: card.dataset.conditions || '[]',
-                            isLocked: card.classList.contains('locked')
-                        }));
-                    } catch (e) {
-                        console.error('页面卸载前保存失败:', e);
-                    }
+                    loadFromServer();
                 }
             });
 
@@ -1939,9 +1902,9 @@ if (!sessionId) {
             function setupAutoSave() {
                 if (autoSaveInterval) clearInterval(autoSaveInterval);
                 autoSaveInterval = setInterval(() => {
-                    if (isConnectedToFirebase && !isLoadingData) {
+                    if (isConnected && !isLoadingData) {
                         console.log("执行自动保存...");
-                        saveToFirebase();
+                        saveToServer();
                     }
                 }, 30000);
             }
@@ -1949,7 +1912,6 @@ if (!sessionId) {
             // 启动应用
             initializeApp();
             setupAutoSave();
-            setupOfflineSupport();
         });
     </script>
 </body>

@@ -9,6 +9,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
         :root {
             --monster-primary: #ae3e3e;
@@ -734,6 +737,35 @@
             margin: 20px 0;
             grid-column: 1 / -1;
         }
+        
+        /* 会话信息样式 */
+        #session-info {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: var(--text-light);
+            background-color: var(--card-bg);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px var(--shadow-color);
+        }
+        
+        #copy-session-link {
+            margin-left: 10px;
+            padding: 5px 10px;
+            background-color: var(--blue);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        #copy-session-link:hover {
+            background-color: #0b7dda;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(33, 150, 243, 0.3);
+        }
 
         /* 移动端优化 */
         @media (max-width: 767px) {
@@ -861,6 +893,56 @@
     
     <script>
         document.addEventListener("DOMContentLoaded", () => {
+            // Firebase 配置
+            const firebaseConfig = {
+                apiKey: "AIzaSyAkzZRKbtnKtnriA1j36rKzl0cvHpc4ZAQ",
+                authDomain: "dnd-battle-1bba4.firebaseapp.com",
+                databaseURL: "https://dnd-battle-1bba4-default-rtdb.firebaseio.com",
+                projectId: "dnd-battle-1bba4",
+                storageBucket: "dnd-battle-1bba4.firebasestorage.app",
+                messagingSenderId: "678762129486",
+                appId: "1:678762129486:web:7013cedb49185bd21a7b1f"
+            };
+
+            // 初始化 Firebase
+            firebase.initializeApp(firebaseConfig);
+            const database = firebase.database();
+
+            // 获取或生成会话ID
+            let sessionId = new URLSearchParams(window.location.search).get('session');
+            if (!sessionId) {
+                sessionId = Math.random().toString(36).substring(2, 12);
+                window.history.pushState({}, '', `?session=${sessionId}`);
+            }
+
+            console.log("当前会话ID:", sessionId);
+            
+            // 添加会话信息显示
+            const sessionInfoDiv = document.createElement("div");
+            sessionInfoDiv.id = "session-info";
+            sessionInfoDiv.innerHTML = `
+                会话ID: <span id="session-id">${sessionId}</span>
+                <button id="copy-session-link">复制链接</button>
+            `;
+            
+            // 插入到标题下方
+            const title = document.querySelector('h1');
+            title.parentNode.insertBefore(sessionInfoDiv, title.nextSibling);
+            
+            // 复制会话链接
+            document.getElementById("copy-session-link").addEventListener("click", () => {
+                const sessionLink = window.location.href;
+                navigator.clipboard.writeText(sessionLink).then(() => {
+                    alert("会话链接已复制到剪贴板，可以分享给其他人");
+                }).catch(err => {
+                    console.error('复制失败: ', err);
+                    prompt("请手动复制以下链接:", sessionLink);
+                });
+            });
+            
+            // 多端同步功能
+            let isLoadingData = false; // 防止保存-加载循环
+            
             const monsterContainer = document.getElementById("monster-container");
             const addMonsterBtn = document.getElementById("add-monster-btn");
             const addAdventurerBtn = document.getElementById("add-adventurer-btn");
@@ -884,6 +966,148 @@
             let dragSrcEl = null;
             let currentCardForStatus = null;
             let customConditionCounter = 1;
+            
+            // 从Firebase加载数据
+            function loadFromFirebase() {
+                if (isLoadingData) return;
+                isLoadingData = true;
+                
+                console.log("正在加载会话数据...");
+                const sessionRef = database.ref('sessions/' + sessionId);
+                
+                sessionRef.once('value').then((snapshot) => {
+                    const data = snapshot.val();
+                    
+                    if (data && data.monsters && data.monsters.length > 0) {
+                        console.log("加载到", data.monsters.length, "个怪物/冒险者");
+                        // 清除现有卡片
+                        monsterContainer.innerHTML = '';
+                        
+                        // 为了确保有序地创建卡片，我们需要获取怪物和冒险者的计数器
+                        let maxMonsterNumber = 0;
+                        let maxAdventurerNumber = 0;
+                        
+                        data.monsters.forEach(monsterData => {
+                            // 更新计数器
+                            if (monsterData.type === 'monster') {
+                                const nameMatch = monsterData.name.match(/\d+$/);
+                                if (nameMatch) {
+                                    const num = parseInt(nameMatch[0]);
+                                    if (num > maxMonsterNumber) maxMonsterNumber = num;
+                                }
+                            } else if (monsterData.type === 'adventurer') {
+                                const nameMatch = monsterData.name.match(/\d+$/);
+                                if (nameMatch) {
+                                    const num = parseInt(nameMatch[0]);
+                                    if (num > maxAdventurerNumber) maxAdventurerNumber = num;
+                                }
+                            }
+                            
+                            // 创建卡片
+                            const card = createMonsterCard(
+                                monsterData.name, 
+                                parseInt(monsterData.maxHp) || 100, 
+                                monsterData.type === 'adventurer'
+                            );
+                            
+                            // 设置卡片ID和类型
+                            card.dataset.id = monsterData.id;
+                            
+                            // 设置卡片属性
+                            card.querySelector('.current-hp-input').value = monsterData.currentHp;
+                            card.querySelector('.temp-hp-input').value = monsterData.tempHp || 0;
+                            
+                            // 设置状态
+                            if (monsterData.conditions) {
+                                card.dataset.conditions = typeof monsterData.conditions === 'string' 
+                                    ? monsterData.conditions 
+                                    : JSON.stringify(monsterData.conditions);
+                                
+                                try {
+                                    const conditions = JSON.parse(card.dataset.conditions);
+                                    if (conditions && conditions.length > 0) {
+                                        // 获取状态详情并更新标签
+                                        const conditionObjects = conditions.map(id => {
+                                            return { id };
+                                        });
+                                        updateConditionTags(card, conditionObjects);
+                                    }
+                                } catch (e) {
+                                    console.error("解析状态数据出错:", e);
+                                }
+                            }
+                            
+                            // 设置锁定状态
+                            if (monsterData.isLocked) {
+                                card.classList.add('locked');
+                                const lockButton = card.querySelector('.lock-button');
+                                lockButton.textContent = '🔒';
+                                lockButton.title = '解锁卡片';
+                            }
+                            
+                            updateHpBar(card);
+                            monsterContainer.appendChild(card);
+                        });
+                        
+                        // 更新计数器
+                        monsterCounter = maxMonsterNumber + 1;
+                        adventurerCounter = maxAdventurerNumber + 1;
+                    } else {
+                        console.log("没有找到会话数据或数据为空");
+                        showEmptyState();
+                    }
+                    
+                    isLoadingData = false;
+                }).catch(error => {
+                    console.error("加载数据出错:", error);
+                    isLoadingData = false;
+                });
+            }
+            
+            // 保存数据到Firebase
+            function saveToFirebase() {
+                if (isLoadingData) return;
+                
+                console.log("正在保存会话数据...");
+                const monsterCards = Array.from(document.querySelectorAll('.monster-card')).map(card => {
+                    return {
+                        id: card.dataset.id,
+                        type: card.dataset.type,
+                        name: card.querySelector('.monster-name').textContent,
+                        currentHp: card.querySelector('.current-hp-input').value,
+                        maxHp: card.querySelector('.max-hp-input').value,
+                        tempHp: card.querySelector('.temp-hp-input').value || 0,
+                        conditions: card.dataset.conditions || '[]',
+                        isLocked: card.classList.contains('locked')
+                    };
+                });
+                
+                database.ref('sessions/' + sessionId).set({
+                    monsters: monsterCards,
+                    lastUpdated: firebase.database.ServerValue.TIMESTAMP
+                }).then(() => {
+                    console.log("数据保存成功");
+                }).catch(error => {
+                    console.error("保存数据出错:", error);
+                });
+            }
+
+            // 监听实时更新
+            function setupRealtimeSync() {
+                console.log("设置实时同步...");
+                const sessionRef = database.ref('sessions/' + sessionId);
+                
+                // 当数据改变时重新加载
+                sessionRef.on('value', (snapshot) => {
+                    // 只有当数据不是由当前客户端保存的才重新加载
+                    if (!isLoadingData) {
+                        console.log("收到实时数据更新");
+                        loadFromFirebase();
+                    }
+                }, (error) => {
+                    console.error("监听实时更新出错:", error);
+                });
+            }
             
             // 定义状态列表
             const conditions = [
@@ -995,6 +1219,9 @@
                     if (monsterContainer.children.length === 0) {
                         showEmptyState();
                     }
+                    
+                    // 保存数据
+                    saveToFirebase();
                 });
 
                 // 锁定按钮事件
@@ -1009,6 +1236,9 @@
                         lockButton.textContent = "🔓";
                         lockButton.title = "锁定卡片";
                     }
+                    
+                    // 保存数据
+                    saveToFirebase();
                 });
                 
                 // 状态按钮事件
@@ -1035,6 +1265,7 @@
                     }
                     
                     updateHpBar(monsterCard);
+                    saveToFirebase();
                 });
 
                 // 最大血量修改事件
@@ -1055,6 +1286,7 @@
                     }
                     
                     updateHpBar(monsterCard);
+                    saveToFirebase();
                 });
 
                 // 临时生命值修改事件
@@ -1067,6 +1299,7 @@
                     }
                     
                     updateHpBar(monsterCard);
+                    saveToFirebase();
                 });
 
                 // 伤害按钮事件
@@ -1087,6 +1320,12 @@
                     if (e.key === "Enter") {
                         applyDamage(monsterCard, true);
                     }
+                });
+                
+                // 名称修改事件
+                const monsterName = monsterCard.querySelector(".monster-name");
+                monsterName.addEventListener("blur", () => {
+                    saveToFirebase();
                 });
 
                 // 添加拖拽事件监听器
@@ -1191,6 +1430,9 @@
                 updateHpBar(monsterCard);
                 damageInput.value = "";
                 damageInput.focus();
+                
+                // 保存数据
+                saveToFirebase();
             }
 
             function showEmptyState() {
@@ -1286,6 +1528,9 @@
                 
                 // 关闭选择器
                 closeStatusSelector();
+                
+                // 保存数据
+                saveToFirebase();
             }
             
             function updateConditionTags(card, conditions) {
@@ -1353,6 +1598,9 @@
                     } else {
                         container.insertBefore(dragSrcEl, this);
                     }
+                    
+                    // 保存数据
+                    saveToFirebase();
                 }
                 
                 return false;
@@ -1373,6 +1621,9 @@
                 const maxHp = parseInt(defaultHpInput.value) || 100;
                 const newMonsterCard = createMonsterCard(name, maxHp, false);
                 monsterContainer.appendChild(newMonsterCard);
+                
+                // 保存数据
+                saveToFirebase();
             });
 
             // 添加冒险者按钮事件
@@ -1381,6 +1632,9 @@
                 const maxHp = parseInt(defaultHpInput.value) || 100;
                 const newMonsterCard = createMonsterCard(name, maxHp, true);
                 monsterContainer.appendChild(newMonsterCard);
+                
+                // 保存数据
+                saveToFirebase();
             });
 
             // 重置所有按钮事件 - 现在会排除锁定的卡片
@@ -1393,6 +1647,9 @@
                     if (monsterContainer.children.length === 0) {
                         showEmptyState();
                     }
+                    
+                    // 保存数据
+                    saveToFirebase();
                 }
             });
             
@@ -1420,6 +1677,12 @@
                     addCustomStatusBtn.click();
                 }
             });
+            
+            // 在页面加载时加载数据
+            loadFromFirebase();
+            
+            // 设置实时同步
+            setupRealtimeSync();
         });
     </script>
 </body>

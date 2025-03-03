@@ -59,6 +59,7 @@
             max-width: 1200px;
             margin: auto;
             padding: 10px;
+            position: relative;
         }
 
         h1 {
@@ -767,6 +768,121 @@
             box-shadow: 0 2px 4px rgba(33, 150, 243, 0.3);
         }
 
+        /* 加载状态和错误提示样式 */
+        #loading-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 25px 40px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            z-index: 1000;
+            min-width: 200px;
+        }
+
+        .loading-spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid var(--blue);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1.5s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .error-message {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #c62828;
+            max-width: 90%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .error-message p {
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+
+        .error-message button {
+            background-color: var(--blue);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .error-message button:hover {
+            background-color: #0b7dda;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3);
+        }
+
+        /* 同步状态指示器 */
+        #sync-status {
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            background-color: var(--card-bg);
+            border-radius: 20px;
+            padding: 8px 15px;
+            box-shadow: 0 2px 10px var(--shadow-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-light);
+            z-index: 100;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.3s, transform 0.3s;
+        }
+
+        #sync-status.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        #sync-status.syncing .sync-indicator {
+            background-color: var(--yellow);
+        }
+
+        #sync-status.success .sync-indicator {
+            background-color: var(--green);
+        }
+
+        #sync-status.error .sync-indicator {
+            background-color: var(--red);
+        }
+
+        .sync-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--green);
+        }
+
         /* 移动端优化 */
         @media (max-width: 767px) {
             .monster-grid {
@@ -860,7 +976,6 @@
             </div>
         </div>
     </div>
-    
     <!-- 状态选择器面板 -->
     <div class="status-selector" id="status-selector">
         <div class="status-panel">
@@ -889,6 +1004,12 @@
                 <button class="apply-status">应用</button>
             </div>
         </div>
+    </div>
+    
+    <!-- 同步状态指示器 -->
+    <div id="sync-status">
+        <span class="sync-indicator"></span>
+        <span class="sync-text">已同步</span>
     </div>
     
     <script>
@@ -929,19 +1050,10 @@
             const title = document.querySelector('h1');
             title.parentNode.insertBefore(sessionInfoDiv, title.nextSibling);
             
-            // 复制会话链接
-            document.getElementById("copy-session-link").addEventListener("click", () => {
-                const sessionLink = window.location.href;
-                navigator.clipboard.writeText(sessionLink).then(() => {
-                    alert("会话链接已复制到剪贴板，可以分享给其他人");
-                }).catch(err => {
-                    console.error('复制失败: ', err);
-                    prompt("请手动复制以下链接:", sessionLink);
-                });
-            });
-            
-            // 多端同步功能
+            // 设置连接状态变量
+            let isConnectedToFirebase = false;
             let isLoadingData = false; // 防止保存-加载循环
+            let lastSaveTime = 0;
             
             const monsterContainer = document.getElementById("monster-container");
             const addMonsterBtn = document.getElementById("add-monster-btn");
@@ -950,6 +1062,7 @@
             const defaultHpInput = document.getElementById("default-hp");
             const monsterNamePrefix = document.getElementById("monster-name-prefix");
             const adventurerNamePrefix = document.getElementById("adventurer-name-prefix");
+            const syncStatus = document.getElementById("sync-status");
             
             // 状态选择器元素
             const statusSelector = document.getElementById("status-selector");
@@ -967,15 +1080,222 @@
             let currentCardForStatus = null;
             let customConditionCounter = 1;
             
+            // 加载和同步函数
+            function initializeApp() {
+                console.log("初始化应用...");
+                
+                // 禁用按钮，直到连接建立
+                setButtonsEnabled(false);
+                
+                // 添加加载指示器
+                showLoadingState("正在连接到服务器...");
+                
+                // 初始设置同步状态指示器
+                updateSyncStatus("connecting", "正在连接");
+                
+                // 检查连接状态
+                const connectedRef = database.ref(".info/connected");
+                connectedRef.on("value", (snap) => {
+                    if (snap.val() === true) {
+                        console.log("已连接到Firebase");
+                        isConnectedToFirebase = true;
+                        updateSyncStatus("success", "已连接");
+                        
+                        // 启用按钮
+                        setButtonsEnabled(true);
+                        
+                        // 加载数据
+                        loadFromFirebase(true);
+                        
+                        // 设置实时同步
+                        setupRealtimeSync();
+                        
+                        // 复制会话链接按钮
+                        setupCopySessionLink();
+                    } else {
+                        console.log("未连接到Firebase");
+                        isConnectedToFirebase = false;
+                        updateSyncStatus("error", "未连接");
+                        
+                        // 取消加载指示器
+                        hideLoadingState();
+                        
+                        // 显示连接错误
+                        showConnectionError();
+                    }
+                });
+            }
+            
+            // 显示加载状态
+            function showLoadingState(message = "正在加载战斗数据...") {
+                // 首先移除现有的加载指示器（如果有）
+                hideLoadingState();
+                
+                const loadingDiv = document.createElement("div");
+                loadingDiv.id = "loading-indicator";
+                loadingDiv.innerHTML = `
+                    <div class="loading-spinner"></div>
+                    <p class="loading-text">${message}</p>
+                `;
+                document.body.appendChild(loadingDiv);
+            }
+            
+            // 隐藏加载状态
+            function hideLoadingState() {
+                const existingLoader = document.getElementById("loading-indicator");
+                if (existingLoader) {
+                    existingLoader.remove();
+                }
+            }
+            
+            // 显示连接错误
+            function showConnectionError() {
+                hideErrorMessages();
+                
+                const errorDiv = document.createElement("div");
+                errorDiv.id = "connection-error";
+                errorDiv.className = "error-message";
+                errorDiv.innerHTML = `
+                    <p>无法连接到服务器，请检查网络连接。</p>
+                    <button id="retry-connection-btn">重试连接</button>
+                `;
+                document.querySelector('.container').appendChild(errorDiv);
+                
+                document.getElementById("retry-connection-btn").addEventListener("click", () => {
+                    errorDiv.remove();
+                    initializeApp();
+                });
+            }
+            
+            // 显示加载错误
+            function showLoadingError(error) {
+                hideErrorMessages();
+                
+                const errorDiv = document.createElement("div");
+                errorDiv.id = "loading-error";
+                errorDiv.className = "error-message";
+                errorDiv.innerHTML = `
+                    <p>加载数据失败: ${error.message || "未知错误"}</p>
+                    <button id="retry-loading-btn">重试加载</button>
+                `;
+                document.querySelector('.container').appendChild(errorDiv);
+                
+                document.getElementById("retry-loading-btn").addEventListener("click", () => {
+                    errorDiv.remove();
+                    loadFromFirebase(true);
+                });
+            }
+            
+            // 显示保存错误
+            function showSaveError(error) {
+                updateSyncStatus("error", "同步失败");
+                
+                const errorDiv = document.createElement("div");
+                errorDiv.id = "save-error";
+                errorDiv.className = "error-message";
+                errorDiv.innerHTML = `
+                    <p>保存数据失败: ${error.message || "未知错误"}</p>
+                    <button id="retry-save-btn">重试保存</button>
+                `;
+                document.querySelector('.container').appendChild(errorDiv);
+                
+                document.getElementById("retry-save-btn").addEventListener("click", () => {
+                    errorDiv.remove();
+                    saveToFirebase();
+                });
+                
+                // 3秒后自动隐藏错误消息
+                setTimeout(() => {
+                    if(document.getElementById("save-error")) {
+                        document.getElementById("save-error").remove();
+                    }
+                }, 3000);
+            }
+            
+            // 隐藏所有错误消息
+            function hideErrorMessages() {
+                const errors = document.querySelectorAll('.error-message');
+                errors.forEach(error => error.remove());
+            }
+            
+            // 设置按钮启用状态
+            function setButtonsEnabled(enabled) {
+                addMonsterBtn.disabled = !enabled;
+                addAdventurerBtn.disabled = !enabled;
+                resetAllBtn.disabled = !enabled;
+                
+                if (!enabled) {
+                    addMonsterBtn.style.opacity = "0.6";
+                    addAdventurerBtn.style.opacity = "0.6";
+                    resetAllBtn.style.opacity = "0.6";
+                } else {
+                    addMonsterBtn.style.opacity = "1";
+                    addAdventurerBtn.style.opacity = "1";
+                    resetAllBtn.style.opacity = "1";
+                }
+            }
+            
+            // 更新同步状态指示器
+            function updateSyncStatus(state, message) {
+                syncStatus.className = "";
+                syncStatus.classList.add("show");
+                
+                if (state === "syncing") {
+                    syncStatus.classList.add("syncing");
+                } else if (state === "success") {
+                    syncStatus.classList.add("success");
+                } else if (state === "error") {
+                    syncStatus.classList.add("error");
+                }
+                
+                syncStatus.querySelector(".sync-text").textContent = message;
+                
+                // 自动隐藏成功状态
+                if (state === "success") {
+                    setTimeout(() => {
+                        syncStatus.classList.remove("show");
+                    }, 2000);
+                }
+            }
+            
+            // 设置复制会话链接按钮
+            function setupCopySessionLink() {
+                document.getElementById("copy-session-link").addEventListener("click", () => {
+                    const sessionLink = window.location.href;
+                    navigator.clipboard.writeText(sessionLink).then(() => {
+                        alert("会话链接已复制到剪贴板，可以分享给其他人");
+                    }).catch(err => {
+                        console.error('复制失败: ', err);
+                        prompt("请手动复制以下链接:", sessionLink);
+                    });
+                });
+            }
+            
             // 从Firebase加载数据
-            function loadFromFirebase() {
+            function loadFromFirebase(isInitialLoad = false) {
                 if (isLoadingData) return;
                 isLoadingData = true;
+                
+                // 如果是初始加载，显示加载状态
+                if (isInitialLoad) {
+                    showLoadingState("正在加载战斗数据...");
+                    updateSyncStatus("syncing", "正在加载数据");
+                }
                 
                 console.log("正在加载会话数据...");
                 const sessionRef = database.ref('sessions/' + sessionId);
                 
+                // 设置超时检测
+                let loadingTimeout = setTimeout(() => {
+                    console.log("加载数据超时");
+                    isLoadingData = false;
+                    hideLoadingState();
+                    updateSyncStatus("error", "加载超时");
+                    showLoadingError({ message: "加载超时，请检查网络连接" });
+                }, 15000); // 15秒超时
+                
                 sessionRef.once('value').then((snapshot) => {
+                    clearTimeout(loadingTimeout);
                     const data = snapshot.val();
                     
                     if (data && data.monsters && data.monsters.length > 0) {
@@ -1019,35 +1339,35 @@
                             
                             // 设置状态
                             if (monsterData.conditions) {
-    card.dataset.conditions = typeof monsterData.conditions === 'string' 
-        ? monsterData.conditions 
-        : JSON.stringify(monsterData.conditions);
-    
-    try {
-        const conditionIds = JSON.parse(card.dataset.conditions);
-        if (conditionIds && conditionIds.length > 0) {
-            // 将ID转换为条件对象
-            const conditionObjects = conditionIds.map(id => {
-                // 查找预定义条件
-                const predefined = conditions.find(c => c.id === id);
-                if (predefined) {
-                    return predefined;
-                } else if (id.startsWith('custom-')) {
-                    // 自定义条件
-                    return {
-                        id: id,
-                        name: id.split('-')[1] || "自定义状态",
-                        custom: true
-                    };
-                }
-                return { id };
-            });
-            updateConditionTags(card, conditionObjects);
-        }
-    } catch (e) {
-        console.error("解析状态数据出错:", e);
-    }
-}
+                                card.dataset.conditions = typeof monsterData.conditions === 'string' 
+                                    ? monsterData.conditions 
+                                    : JSON.stringify(monsterData.conditions);
+                                
+                                try {
+                                    const conditionIds = JSON.parse(card.dataset.conditions);
+                                    if (conditionIds && conditionIds.length > 0) {
+                                        // 将ID转换为条件对象
+                                        const conditionObjects = conditionIds.map(id => {
+                                            // 查找预定义条件
+                                            const predefined = conditions.find(c => c.id === id);
+                                            if (predefined) {
+                                                return predefined;
+                                            } else if (id.startsWith('custom-')) {
+                                                // 自定义条件
+                                                return {
+                                                    id: id,
+                                                    name: id.split('-')[1] || "自定义状态",
+                                                    custom: true
+                                                };
+                                            }
+                                            return { id };
+                                        });
+                                        updateConditionTags(card, conditionObjects);
+                                    }
+                                } catch (e) {
+                                    console.error("解析状态数据出错:", e);
+                                }
+                            }
                             
                             // 设置锁定状态
                             if (monsterData.isLocked) {
@@ -1070,17 +1390,29 @@
                     }
                     
                     isLoadingData = false;
+                    hideLoadingState();
+                    updateSyncStatus("success", "数据已加载");
                 }).catch(error => {
+                    clearTimeout(loadingTimeout);
                     console.error("加载数据出错:", error);
                     isLoadingData = false;
+                    
+                    hideLoadingState();
+                    updateSyncStatus("error", "加载失败");
+                    
+                    if (isInitialLoad) {
+                        showLoadingError(error);
+                    }
                 });
             }
             
             // 保存数据到Firebase
             function saveToFirebase() {
-                if (isLoadingData) return;
+                if (isLoadingData || !isConnectedToFirebase) return;
                 
+                updateSyncStatus("syncing", "正在保存...");
                 console.log("正在保存会话数据...");
+                
                 const monsterCards = Array.from(document.querySelectorAll('.monster-card')).map(card => {
                     return {
                         id: card.dataset.id,
@@ -1094,13 +1426,23 @@
                     };
                 });
                 
+                // 设置一个时间标记来跟踪这次保存
+                const saveTime = Date.now();
+                lastSaveTime = saveTime;
+                
                 database.ref('sessions/' + sessionId).set({
                     monsters: monsterCards,
                     lastUpdated: firebase.database.ServerValue.TIMESTAMP
                 }).then(() => {
                     console.log("数据保存成功");
+                    // 只有当这是最新的保存操作时才更新状态
+                    if (saveTime === lastSaveTime) {
+                        updateSyncStatus("success", "已保存");
+                    }
                 }).catch(error => {
                     console.error("保存数据出错:", error);
+                    updateSyncStatus("error", "保存失败");
+                    showSaveError(error);
                 });
             }
 
@@ -1118,6 +1460,7 @@
                     }
                 }, (error) => {
                     console.error("监听实时更新出错:", error);
+                    updateSyncStatus("error", "同步错误");
                 });
             }
             
@@ -1224,7 +1567,8 @@
                 `;
 
                 // 删除怪物事件
-                monsterCard.querySelector(".delete-button").addEventListener("click", () => {
+                monsterCard.querySelector(".delete-button").addEventListener("click", (e) => {
+                    e.stopPropagation(); // 阻止冒泡，避免触发拖拽
                     monsterCard.remove();
                     
                     // 如果没有怪物了，显示空状态提示
@@ -1238,7 +1582,8 @@
 
                 // 锁定按钮事件
                 const lockButton = monsterCard.querySelector(".lock-button");
-                lockButton.addEventListener("click", () => {
+                lockButton.addEventListener("click", (e) => {
+                    e.stopPropagation(); // 阻止冒泡，避免触发拖拽
                     monsterCard.classList.toggle("locked");
                     
                     if (monsterCard.classList.contains("locked")) {
@@ -1255,7 +1600,8 @@
                 
                 // 状态按钮事件
                 const statusButton = monsterCard.querySelector(".status-button");
-                statusButton.addEventListener("click", () => {
+                statusButton.addEventListener("click", (e) => {
+                    e.stopPropagation(); // 阻止冒泡，避免触发拖拽
                     openStatusSelector(monsterCard);
                 });
 
@@ -1338,6 +1684,11 @@
                 const monsterName = monsterCard.querySelector(".monster-name");
                 monsterName.addEventListener("blur", () => {
                     saveToFirebase();
+                });
+                
+                // 阻止名称编辑触发拖拽
+                monsterName.addEventListener("mousedown", (e) => {
+                    e.stopPropagation();
                 });
 
                 // 添加拖拽事件监听器
@@ -1462,7 +1813,13 @@
                 conditionsGrid.innerHTML = "";
                 
                 // 获取当前卡片的状态
-                const currentConditions = JSON.parse(card.dataset.conditions || "[]");
+                let currentConditions;
+                try {
+                    currentConditions = JSON.parse(card.dataset.conditions || "[]");
+                } catch (e) {
+                    console.error("解析状态数据出错:", e);
+                    currentConditions = [];
+                }
                 
                 // 添加所有状态选项
                 conditions.forEach(condition => {
@@ -1546,48 +1903,54 @@
             }
             
             function updateConditionTags(card, conditionObjects) {
-    const tagsContainer = card.querySelector(".tags-container");
-    
-    // 移除除了状态徽章外的所有标签
-    Array.from(tagsContainer.children).forEach(child => {
-        if (!child.classList.contains("status-badge")) {
-            child.remove();
-        }
-    });
-    
-    // 添加选中的状态标签
-    conditionObjects.forEach(condition => {
-        // 如果只有ID，获取完整的条件信息
-        let fullCondition = condition;
-        if (condition.id && !condition.name) {
-            // 查找预定义条件
-            const predefined = conditions.find(c => c.id === condition.id);
-            if (predefined) {
-                fullCondition = predefined;
-            } else if (condition.id.startsWith('custom-')) {
-                // 这是自定义条件，但我们没有它的完整信息
-                // 使用简化版本
-                fullCondition = {
-                    id: condition.id,
-                    name: condition.id.split('-')[1] || "自定义",
-                    desc: "",
-                    custom: true
-                };
+                const tagsContainer = card.querySelector(".tags-container");
+                
+                // 移除除了状态徽章外的所有标签
+                Array.from(tagsContainer.children).forEach(child => {
+                    if (!child.classList.contains("status-badge")) {
+                        child.remove();
+                    }
+                });
+                
+                // 添加选中的状态标签
+                conditionObjects.forEach(condition => {
+                    // 如果只有ID，获取完整的条件信息
+                    let fullCondition = condition;
+                    if (condition.id && !condition.name) {
+                        // 查找预定义条件
+                        const predefined = conditions.find(c => c.id === condition.id);
+                        if (predefined) {
+                            fullCondition = predefined;
+                        } else if (condition.id.startsWith('custom-')) {
+                            // 这是自定义条件，但我们没有它的完整信息
+                            // 使用简化版本
+                            fullCondition = {
+                                id: condition.id,
+                                name: condition.id.split('-')[1] || "自定义",
+                                desc: "",
+                                custom: true
+                            };
+                        }
+                    }
+                    
+                    const tag = document.createElement("span");
+                    tag.className = fullCondition.custom ? "condition-tag custom" : "condition-tag";
+                    tag.dataset.id = fullCondition.id;
+                    tag.dataset.cardId = card.dataset.id;
+                    tag.textContent = fullCondition.name;
+                    tag.title = fullCondition.desc || '';
+                    tagsContainer.appendChild(tag);
+                });
             }
-        }
-        
-        const tag = document.createElement("span");
-        tag.className = fullCondition.custom ? "condition-tag custom" : "condition-tag";
-        tag.dataset.id = fullCondition.id;
-        tag.dataset.cardId = card.dataset.id;
-        tag.textContent = fullCondition.name;
-        tag.title = fullCondition.desc || '';
-        tagsContainer.appendChild(tag);
-    });
-}
 
             // 拖拽相关函数
             function handleDragStart(e) {
+                // 如果卡片被锁定，不允许拖拽
+                if (this.classList.contains("locked")) {
+                    e.preventDefault();
+                    return false;
+                }
+                
                 this.style.opacity = '0.4';
                 dragSrcEl = this;
                 e.dataTransfer.effectAllowed = 'move';
@@ -1613,6 +1976,11 @@
             function handleDrop(e) {
                 if (e.stopPropagation) {
                     e.stopPropagation(); // 阻止某些浏览器的重定向
+                }
+                
+                // 如果源元素或目标元素被锁定，不允许交换
+                if (dragSrcEl === null || dragSrcEl.classList.contains("locked") || this.classList.contains("locked")) {
+                    return false;
                 }
                 
                 // 只有在不同卡片之间才进行交换
@@ -1648,6 +2016,11 @@
 
             // 添加怪物按钮事件
             addMonsterBtn.addEventListener("click", () => {
+                if (!isConnectedToFirebase) {
+                    alert("未连接到服务器，请检查网络连接并刷新页面");
+                    return;
+                }
+                
                 const name = `${monsterNamePrefix.value} ${monsterCounter++}`;
                 const maxHp = parseInt(defaultHpInput.value) || 100;
                 const newMonsterCard = createMonsterCard(name, maxHp, false);
@@ -1659,6 +2032,11 @@
 
             // 添加冒险者按钮事件
             addAdventurerBtn.addEventListener("click", () => {
+                if (!isConnectedToFirebase) {
+                    alert("未连接到服务器，请检查网络连接并刷新页面");
+                    return;
+                }
+                
                 const name = `${adventurerNamePrefix.value} ${adventurerCounter++}`;
                 const maxHp = parseInt(defaultHpInput.value) || 100;
                 const newMonsterCard = createMonsterCard(name, maxHp, true);
@@ -1670,6 +2048,11 @@
 
             // 重置所有按钮事件 - 现在会排除锁定的卡片
             resetAllBtn.addEventListener("click", () => {
+                if (!isConnectedToFirebase) {
+                    alert("未连接到服务器，请检查网络连接并刷新页面");
+                    return;
+                }
+                
                 if (confirm("确定要移除所有非锁定的怪物和冒险者吗？")) {
                     const cards = document.querySelectorAll('.monster-card:not(.locked)');
                     cards.forEach(card => card.remove());
@@ -1709,11 +2092,131 @@
                 }
             });
             
-            // 在页面加载时加载数据
-            loadFromFirebase();
+            // 网络状态监听
+            window.addEventListener('online', () => {
+                console.log('网络已连接');
+                if (!isConnectedToFirebase) {
+                    updateSyncStatus("syncing", "重新连接中...");
+                    setTimeout(() => initializeApp(), 1000); // 延迟重连以确保网络稳定
+                }
+            });
             
-            // 设置实时同步
-            setupRealtimeSync();
+            window.addEventListener('offline', () => {
+                console.log('网络连接已断开');
+                updateSyncStatus("error", "网络已断开");
+                isConnectedToFirebase = false;
+            });
+            
+            // 处理页面可见性变化（如从后台切换到前台）
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    console.log('页面恢复前台，检查连接状态');
+                    // 如果之前已连接，尝试重新加载数据
+                    if (isConnectedToFirebase) {
+                        loadFromFirebase();
+                    }
+                }
+            });
+            
+            // 处理页面卸载前的数据保存
+            window.addEventListener('beforeunload', () => {
+                if (isConnectedToFirebase && !isLoadingData) {
+                    // 在这里进行同步保存，确保数据在页面关闭前保存
+                    // 注意：现代浏览器可能会限制此处的同步操作
+                    try {
+                        const monsterCards = Array.from(document.querySelectorAll('.monster-card')).map(card => ({
+                            id: card.dataset.id,
+                            type: card.dataset.type,
+                            name: card.querySelector('.monster-name').textContent,
+                            currentHp: card.querySelector('.current-hp-input').value,
+                            maxHp: card.querySelector('.max-hp-input').value,
+                            tempHp: card.querySelector('.temp-hp-input').value || 0,
+                            conditions: card.dataset.conditions || '[]',
+                            isLocked: card.classList.contains('locked')
+                        }));
+                        
+                        // 使用navigator.sendBeacon进行异步但可靠的数据发送
+                        if (navigator.sendBeacon) {
+                            const data = new Blob([JSON.stringify({
+                                sessionId: sessionId,
+                                monsters: monsterCards,
+                                lastUpdated: Date.now()
+                            })], { type: 'application/json' });
+                            
+                            // 这里可以使用一个专用的保存API端点
+                            // navigator.sendBeacon('/api/save-battle', data);
+                        }
+                    } catch (e) {
+                        console.error('页面卸载前保存失败:', e);
+                    }
+                }
+            });
+            
+            // 添加定时自动保存功能（每30秒）
+            let autoSaveInterval;
+            
+            function setupAutoSave() {
+                // 清除现有的自动保存
+                if (autoSaveInterval) {
+                    clearInterval(autoSaveInterval);
+                }
+                
+                // 设置新的自动保存
+                autoSaveInterval = setInterval(() => {
+                    if (isConnectedToFirebase && !isLoadingData) {
+                        console.log("执行自动保存...");
+                        saveToFirebase();
+                    }
+                }, 30000); // 30秒
+            }
+            
+            // 错误重试机制
+            let retryCount = 0;
+            const MAX_RETRIES = 3;
+            
+            function retryOperation(operation, delay = 2000) {
+                if (retryCount >= MAX_RETRIES) {
+                    console.error(`已达到最大重试次数(${MAX_RETRIES})，操作失败`);
+                    updateSyncStatus("error", "同步失败");
+                    retryCount = 0;
+                    return Promise.reject(new Error("达到最大重试次数"));
+                }
+                
+                return new Promise((resolve, reject) => {
+                    setTimeout(() => {
+                        console.log(`尝试重试操作，第${retryCount + 1}次`);
+                        retryCount++;
+                        
+                        operation()
+                            .then(result => {
+                                retryCount = 0; // 成功后重置计数
+                                resolve(result);
+                            })
+                            .catch(err => {
+                                retryOperation(operation, delay * 2)
+                                    .then(resolve)
+                                    .catch(reject);
+                            });
+                    }, delay);
+                });
+            }
+            
+            // 离线支持设置
+            function setupOfflineSupport() {
+                // 尝试启用持久连接
+                try {
+                    database.goOnline();
+                    database.setPersistenceEnabled(true).catch(err => {
+                        console.log("设置持久化失败:", err);
+                    });
+                } catch (e) {
+                    console.error("设置离线支持时出错:", e);
+                }
+            }
+            
+            // 初始化应用
+            initializeApp();
+            setupAutoSave();
         });
     </script>
 </body>

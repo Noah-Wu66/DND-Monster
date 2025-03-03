@@ -1019,23 +1019,35 @@
                             
                             // 设置状态
                             if (monsterData.conditions) {
-                                card.dataset.conditions = typeof monsterData.conditions === 'string' 
-                                    ? monsterData.conditions 
-                                    : JSON.stringify(monsterData.conditions);
-                                
-                                try {
-                                    const conditions = JSON.parse(card.dataset.conditions);
-                                    if (conditions && conditions.length > 0) {
-                                        // 获取状态详情并更新标签
-                                        const conditionObjects = conditions.map(id => {
-                                            return { id };
-                                        });
-                                        updateConditionTags(card, conditionObjects);
-                                    }
-                                } catch (e) {
-                                    console.error("解析状态数据出错:", e);
-                                }
-                            }
+    card.dataset.conditions = typeof monsterData.conditions === 'string' 
+        ? monsterData.conditions 
+        : JSON.stringify(monsterData.conditions);
+    
+    try {
+        const conditionIds = JSON.parse(card.dataset.conditions);
+        if (conditionIds && conditionIds.length > 0) {
+            // 将ID转换为条件对象
+            const conditionObjects = conditionIds.map(id => {
+                // 查找预定义条件
+                const predefined = conditions.find(c => c.id === id);
+                if (predefined) {
+                    return predefined;
+                } else if (id.startsWith('custom-')) {
+                    // 自定义条件
+                    return {
+                        id: id,
+                        name: id.split('-')[1] || "自定义状态",
+                        custom: true
+                    };
+                }
+                return { id };
+            });
+            updateConditionTags(card, conditionObjects);
+        }
+    } catch (e) {
+        console.error("解析状态数据出错:", e);
+    }
+}
                             
                             // 设置锁定状态
                             if (monsterData.isLocked) {
@@ -1533,27 +1545,46 @@
                 saveToFirebase();
             }
             
-            function updateConditionTags(card, conditions) {
-                const tagsContainer = card.querySelector(".tags-container");
-                
-                // 移除除了状态徽章外的所有标签
-                Array.from(tagsContainer.children).forEach(child => {
-                    if (!child.classList.contains("status-badge")) {
-                        child.remove();
-                    }
-                });
-                
-                // 添加选中的状态标签
-                conditions.forEach(condition => {
-                    const tag = document.createElement("span");
-                    tag.className = condition.custom ? "condition-tag custom" : "condition-tag";
-                    tag.dataset.id = condition.id;
-                    tag.dataset.cardId = card.dataset.id;
-                    tag.textContent = condition.name;
-                    tag.title = condition.desc || '';
-                    tagsContainer.appendChild(tag);
-                });
+            function updateConditionTags(card, conditionObjects) {
+    const tagsContainer = card.querySelector(".tags-container");
+    
+    // 移除除了状态徽章外的所有标签
+    Array.from(tagsContainer.children).forEach(child => {
+        if (!child.classList.contains("status-badge")) {
+            child.remove();
+        }
+    });
+    
+    // 添加选中的状态标签
+    conditionObjects.forEach(condition => {
+        // 如果只有ID，获取完整的条件信息
+        let fullCondition = condition;
+        if (condition.id && !condition.name) {
+            // 查找预定义条件
+            const predefined = conditions.find(c => c.id === condition.id);
+            if (predefined) {
+                fullCondition = predefined;
+            } else if (condition.id.startsWith('custom-')) {
+                // 这是自定义条件，但我们没有它的完整信息
+                // 使用简化版本
+                fullCondition = {
+                    id: condition.id,
+                    name: condition.id.split('-')[1] || "自定义",
+                    desc: "",
+                    custom: true
+                };
             }
+        }
+        
+        const tag = document.createElement("span");
+        tag.className = fullCondition.custom ? "condition-tag custom" : "condition-tag";
+        tag.dataset.id = fullCondition.id;
+        tag.dataset.cardId = card.dataset.id;
+        tag.textContent = fullCondition.name;
+        tag.title = fullCondition.desc || '';
+        tagsContainer.appendChild(tag);
+    });
+}
 
             // 拖拽相关函数
             function handleDragStart(e) {

@@ -1124,6 +1124,13 @@
                         refreshUIFromData(data);
                     }
                 });
+
+                socket.on('delete-monster', (data) => {
+                    if (data && data.monsterId) {
+                        console.log("收到怪物删除通知:", data.monsterId);
+                        removeMonsterById(data.monsterId);
+                    }
+                });
             }
 
             // 初始化应用
@@ -1441,19 +1448,20 @@
                         console.error("解析状态数据出错:", e);
                     }
                 }
+    
+    const lockButton = card.querySelector('.lock-button');
+    if (monsterData.isLocked) {
+        card.classList.add('locked');
+        lockButton.textContent = '🔒';
+        lockButton.title = '解锁卡片';
+    } else {
+        card.classList.remove('locked');
+        lockButton.textContent = '🔓';
+        lockButton.title = '锁定卡片';
+    }
+    updateHpBar(card);
+}
 
-                const lockButton = card.querySelector('.lock-button');
-                if (monsterData.isLocked) {
-                    card.classList.add('locked');
-                    lockButton.textContent = '🔒';
-                    lockButton.title = '解锁卡片';
-                } else {
-                    card.classList.remove('locked');
-                    lockButton.textContent = '🔓';
-                    lockButton.title = '锁定卡片';
-                }
-                updateHpBar(card);
-            }
 
             function removeMonsterById(id) {
                 const card = document.querySelector(`.monster-card[data-id="${id}"]`);
@@ -1538,10 +1546,18 @@
 
                 monsterCard.querySelector(".delete-button").addEventListener("click", (e) => {
                     e.stopPropagation();
+                    const monsterId = monsterCard.dataset.id;
                     monsterCard.remove();
                     if (!monsterContainer.children.length) showEmptyState();
+                    if (socket && socket.connected) {
+                        socket.emit('delete-monster', {
+                            sessionId: sessionId,
+                            monsterId: monsterId
+                        });
+                    }
                     saveToServer();
                 });
+
 
                 const lockButton = monsterCard.querySelector(".lock-button");
                 lockButton.addEventListener("click", (e) => {

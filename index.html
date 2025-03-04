@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <!-- 元数据和资源链接 -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>战斗助手 - 怪物与冒险者</title>
@@ -9,12 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
-    <!-- 添加Socket.io客户端库 -->
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
-
-    <!-- 样式定义 -->
     <style>
-        /* 全局变量 */
         :root {
             --monster-primary: #ae3e3e;
             --monster-secondary: #ffd1d1;
@@ -38,14 +33,11 @@
             --orange: #FF9800;
             --temp-hp: #1E88E5;
         }
-
-        /* 重置默认样式 */
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
         }
-
         body {
             margin: 0;
             padding: 15px;
@@ -54,15 +46,12 @@
             color: var(--text-color);
             line-height: 1.5;
         }
-
-        /* 布局容器 */
         .container {
             max-width: 1200px;
             margin: auto;
             padding: 10px;
             position: relative;
         }
-
         h1 {
             text-align: center;
             margin: 15px 0;
@@ -70,8 +59,6 @@
             color: var(--text-color);
             font-weight: 700;
         }
-
-        /* 控制面板 */
         .controls-panel {
             background: var(--card-bg);
             border-radius: 12px;
@@ -80,11 +67,9 @@
             box-shadow: 0 4px 12px var(--shadow-color);
             transition: box-shadow 0.3s ease;
         }
-
         .controls-panel:hover {
             box-shadow: 0 8px 16px var(--shadow-color);
         }
-
         .monster-controls {
             display: flex;
             flex-wrap: wrap;
@@ -92,7 +77,6 @@
             gap: 15px;
             margin-bottom: 15px;
         }
-
         .monster-controls button {
             padding: 12px 20px;
             font-size: 15px;
@@ -105,63 +89,50 @@
             transition: all 0.2s ease;
             box-shadow: 0 2px 4px var(--shadow-color);
         }
-
         #add-monster-btn {
             background-color: var(--monster-primary);
         }
-
         #add-monster-btn:hover {
             background-color: #922e2e;
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(174, 62, 62, 0.3);
         }
-
         #add-adventurer-btn {
             background-color: var(--adventurer-primary);
         }
-
         #add-adventurer-btn:hover {
             background-color: #1a5185;
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(42, 106, 168, 0.3);
         }
-
         #reset-all-btn {
             background-color: var(--orange);
         }
-
         #reset-all-btn:hover {
             background-color: #e68900;
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(255, 152, 0, 0.3);
         }
-
         #manual-sync-btn {
             background-color: var(--blue);
         }
-
         #manual-sync-btn:hover {
             background-color: #0b7dda;
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3);
         }
-
         .sync-icon {
             display: inline-block;
             margin-right: 5px;
             transition: transform 0.5s ease;
         }
-
         .sync-button.syncing .sync-icon {
             animation: spin 1s linear infinite;
         }
-
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-
-        /* 设置表单 */
         .setup-form {
             display: flex;
             flex-wrap: wrap;
@@ -171,19 +142,16 @@
             padding-top: 15px;
             border-top: 1px solid var(--border-color);
         }
-
         .form-group {
             display: flex;
             align-items: center;
             gap: 10px;
         }
-
         .form-group label {
             font-size: 14px;
             white-space: nowrap;
             color: var(--text-light);
         }
-
         .form-input {
             padding: 10px;
             border: 1px solid var(--border-color);
@@ -192,22 +160,17 @@
             font-family: inherit;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
-
         .form-input:focus {
             border-color: var(--blue);
             box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
             outline: none;
         }
-
-        /* 怪物网格 */
         .monster-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
             gap: 20px;
             justify-content: center;
         }
-
-        /* 怪物卡片 */
         .monster-card {
             background: var(--card-bg);
             border-radius: 12px;
@@ -218,7 +181,6 @@
             cursor: move;
             overflow: hidden;
         }
-
         .monster-card::before {
             content: '';
             position: absolute;
@@ -228,59 +190,47 @@
             height: 5px;
             background-color: var(--monster-primary);
         }
-
         .monster-card[data-type="monster"] {
             border: 1px solid var(--monster-border);
         }
-
         .monster-card[data-type="monster"]::before {
             background-color: var(--monster-primary);
         }
-
         .monster-card[data-type="monster"] .monster-name {
             background-color: var(--monster-secondary);
         }
-
         .monster-card[data-type="adventurer"] {
             border: 1px solid var(--adventurer-border);
         }
-
         .monster-card[data-type="adventurer"]::before {
             background-color: var(--adventurer-primary);
         }
-
         .monster-card[data-type="adventurer"] .monster-name {
             background-color: var(--adventurer-secondary);
         }
-
         .monster-card:hover {
             transform: translateY(-3px);
             box-shadow: 0 8px 16px var(--shadow-color);
         }
-
         .monster-card.locked {
             border: 2px solid var(--yellow);
             box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
         }
-
         .monster-card.drag-over {
             border: 2px dashed var(--blue);
         }
-
         .monster-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 15px;
         }
-
         .monster-info {
             display: flex;
             flex-direction: column;
             width: 75%;
             gap: 5px;
         }
-
         .monster-name {
             font-weight: 700;
             font-size: 1.2em;
@@ -289,19 +239,16 @@
             width: 100%;
             transition: background-color 0.2s;
         }
-
         .monster-name:focus {
             outline: none;
             box-shadow: 0 0 0 2px var(--blue);
         }
-
         .tags-container {
             display: flex;
             flex-wrap: wrap;
             gap: 5px;
             margin-top: 5px;
         }
-
         .status-badge {
             display: inline-block;
             padding: 4px 10px;
@@ -312,11 +259,9 @@
             font-weight: 500;
             transition: background-color 0.2s;
         }
-
         .status-badge.dead {
             background-color: var(--red);
         }
-
         .condition-tag {
             display: inline-block;
             padding: 3px 8px;
@@ -328,21 +273,17 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-
         .condition-tag:hover {
             transform: translateY(-1px);
             box-shadow: 0 2px 4px rgba(156, 39, 176, 0.3);
         }
-
         .condition-tag.custom {
             background-color: var(--blue);
         }
-
         .card-actions {
             display: flex;
             gap: 8px;
         }
-
         .card-action-btn {
             background-color: transparent;
             border: none;
@@ -357,37 +298,29 @@
             transition: all 0.2s;
             color: var(--text-light);
         }
-
         .card-action-btn:hover {
             background-color: rgba(0, 0, 0, 0.05);
             transform: translateY(-2px);
         }
-
         .lock-button {
             font-size: 20px;
         }
-
         .status-button {
             font-size: 18px;
         }
-
         .delete-button {
             color: white;
             background-color: var(--red);
         }
-
         .delete-button:hover {
             background-color: #d32f2f;
         }
-
-        /* HP显示和控制 */
         .hp-display {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 12px;
         }
-
         .hp-text {
             font-size: 18px;
             font-weight: 700;
@@ -395,13 +328,11 @@
             align-items: center;
             gap: 10px;
         }
-
         .hp-inputs {
             display: flex;
             gap: 5px;
             align-items: center;
         }
-
         .hp-input {
             width: 60px;
             padding: 8px;
@@ -410,26 +341,22 @@
             border-radius: 8px;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
-
         .hp-input:focus {
             border-color: var(--blue);
             box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
             outline: none;
         }
-
         .temp-hp-display {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 12px;
         }
-
         .temp-hp-text {
             font-size: 16px;
             font-weight: 500;
             color: var(--blue);
         }
-
         .temp-hp-input {
             width: 60px;
             padding: 8px;
@@ -438,19 +365,16 @@
             border-radius: 8px;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
-
         .temp-hp-input:focus {
             border-color: var(--blue);
             box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
             outline: none;
         }
-
         .hp-bar-container {
             position: relative;
             height: 22px;
             margin-bottom: 15px;
         }
-
         .hp-bar {
             height: 22px;
             background-color: var(--red);
@@ -459,7 +383,6 @@
             position: relative;
             box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
         }
-
         .hp-bar-fill {
             height: 100%;
             background-color: var(--green);
@@ -468,7 +391,6 @@
             transition: width 0.3s ease-out, background-color 0.3s ease;
             box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.3);
         }
-
         .temp-hp-bar {
             position: absolute;
             top: 0;
@@ -480,7 +402,6 @@
             box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.3);
             z-index: 2;
         }
-
         .hp-bar-text {
             position: absolute;
             top: 50%;
@@ -493,13 +414,11 @@
             z-index: 3;
             user-select: none;
         }
-
         .damage-controls {
             display: flex;
             gap: 10px;
             margin-top: 10px;
         }
-
         .damage-input {
             flex: 1;
             padding: 10px 12px;
@@ -509,13 +428,11 @@
             font-family: inherit;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
-
         .damage-input:focus {
             border-color: var(--blue);
             box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
             outline: none;
         }
-
         .damage-btn, .heal-btn {
             padding: 10px 15px;
             border: none;
@@ -526,28 +443,22 @@
             transition: all 0.2s;
             box-shadow: 0 2px 4px var(--shadow-color);
         }
-
         .damage-btn {
             background-color: var(--red);
         }
-
         .damage-btn:hover {
             background-color: #d32f2f;
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(244, 67, 54, 0.3);
         }
-
         .heal-btn {
             background-color: var(--green);
         }
-
         .heal-btn:hover {
             background-color: #388e3c;
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
         }
-
-        /* 状态选择器 */
         .status-selector {
             position: fixed;
             top: 0;
@@ -563,12 +474,10 @@
             visibility: hidden;
             transition: opacity 0.3s, visibility 0.3s;
         }
-
         .status-selector.active {
             opacity: 1;
             visibility: visible;
         }
-
         .status-panel {
             background-color: white;
             border-radius: 12px;
@@ -581,11 +490,9 @@
             transform: translateY(20px);
             transition: transform 0.3s;
         }
-
         .status-selector.active .status-panel {
             transform: translateY(0);
         }
-
         .status-header {
             display: flex;
             justify-content: space-between;
@@ -594,12 +501,10 @@
             padding-bottom: 15px;
             border-bottom: 1px solid var(--border-color);
         }
-
         .status-title {
             font-size: 1.5em;
             font-weight: 700;
         }
-
         .close-status {
             background: none;
             border: none;
@@ -608,18 +513,15 @@
             color: var(--text-light);
             transition: color 0.2s;
         }
-
         .close-status:hover {
             color: var(--text-color);
         }
-
         .custom-status {
             background-color: #f5f5f5;
             border-radius: 8px;
             padding: 15px;
             margin-bottom: 20px;
         }
-
         .custom-status-title {
             font-weight: 700;
             margin-bottom: 10px;
@@ -627,19 +529,16 @@
             align-items: center;
             gap: 5px;
         }
-
         .custom-status-title svg {
             width: 20px;
             height: 20px;
             fill: var(--blue);
         }
-
         .custom-status-inputs {
             display: flex;
             flex-direction: column;
             gap: 10px;
         }
-
         .custom-status-input {
             padding: 10px;
             border: 1px solid var(--border-color);
@@ -647,13 +546,11 @@
             font-family: inherit;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
-
         .custom-status-input:focus {
             border-color: var(--blue);
             box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
             outline: none;
         }
-
         .add-custom-btn {
             background-color: var(--blue);
             color: white;
@@ -665,19 +562,16 @@
             margin-top: 10px;
             font-weight: 500;
         }
-
         .add-custom-btn:hover {
             background-color: #0b7dda;
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3);
         }
-
         .conditions-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             gap: 15px;
         }
-
         .condition-item {
             padding: 15px;
             border-radius: 8px;
@@ -685,22 +579,18 @@
             transition: all 0.2s;
             cursor: pointer;
         }
-
         .condition-item:hover {
             border-color: var(--blue);
             box-shadow: 0 4px 8px var(--shadow-color);
             transform: translateY(-2px);
         }
-
         .condition-item.selected {
             background-color: var(--adventurer-secondary);
             border-color: var(--adventurer-border);
         }
-
         .condition-item.custom-condition {
             border-left: 3px solid var(--blue);
         }
-
         .condition-name {
             font-weight: 700;
             margin-bottom: 5px;
@@ -708,12 +598,10 @@
             justify-content: space-between;
             align-items: center;
         }
-
         .condition-desc {
             font-size: 13px;
             color: var(--text-light);
         }
-
         .status-buttons {
             display: flex;
             justify-content: flex-end;
@@ -722,7 +610,6 @@
             padding-top: 15px;
             border-top: 1px solid var(--border-color);
         }
-
         .status-buttons button {
             padding: 10px 20px;
             border: none;
@@ -731,26 +618,20 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-
         .cancel-status {
             background-color: #f1f1f1;
             color: var(--text-color);
         }
-
         .cancel-status:hover {
             background-color: #e0e0e0;
         }
-
         .apply-status {
             background-color: var(--blue);
             color: white;
         }
-
         .apply-status:hover {
             background-color: #0b7dda;
         }
-
-        /* 其他元素 */
         .empty-state {
             text-align: center;
             padding: 40px 20px;
@@ -761,7 +642,6 @@
             margin: 20px 0;
             grid-column: 1 / -1;
         }
-
         #session-info {
             text-align: center;
             margin-bottom: 15px;
@@ -772,7 +652,6 @@
             border-radius: 8px;
             box-shadow: 0 2px 6px var(--shadow-color);
         }
-
         #copy-session-link {
             margin-left: 10px;
             padding: 5px 10px;
@@ -783,13 +662,11 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-
         #copy-session-link:hover {
             background-color: #0b7dda;
             transform: translateY(-1px);
             box-shadow: 0 2px 4px rgba(33, 150, 243, 0.3);
         }
-
         #loading-indicator {
             position: fixed;
             top: 50%;
@@ -803,7 +680,6 @@
             z-index: 1000;
             min-width: 200px;
         }
-
         .loading-spinner {
             border: 5px solid #f3f3f3;
             border-top: 5px solid var(--blue);
@@ -813,13 +689,11 @@
             animation: spin 1.5s linear infinite;
             margin: 0 auto 20px;
         }
-
         .loading-text {
             font-size: 16px;
             font-weight: 500;
             color: var(--text-color);
         }
-
         .error-message {
             background-color: #ffebee;
             color: #c62828;
@@ -832,12 +706,10 @@
             margin-left: auto;
             margin-right: auto;
         }
-
         .error-message p {
             margin-bottom: 15px;
             font-weight: 500;
         }
-
         .error-message button {
             background-color: var(--blue);
             color: white;
@@ -848,13 +720,11 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-
         .error-message button:hover {
             background-color: #0b7dda;
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3);
         }
-
         #sync-status {
             position: fixed;
             bottom: 15px;
@@ -873,85 +743,66 @@
             transform: translateY(10px);
             transition: opacity 0.3s, transform 0.3s;
         }
-
         #sync-status.show {
             opacity: 1;
             transform: translateY(0);
         }
-
         #sync-status.syncing .sync-indicator {
             background-color: var(--yellow);
         }
-
         #sync-status.success .sync-indicator {
             background-color: var(--green);
         }
-
         #sync-status.error .sync-indicator {
             background-color: var(--red);
         }
-
         .sync-indicator {
             width: 10px;
             height: 10px;
             border-radius: 50%;
             background-color: var(--green);
         }
-
-        /* 响应式设计 */
         @media (max-width: 767px) {
             .monster-grid {
                 grid-template-columns: 1fr;
             }
-
             .monster-controls {
                 flex-direction: column;
                 align-items: center;
             }
-
             .monster-controls button {
                 width: 100%;
             }
-
             .setup-form {
                 flex-direction: column;
                 align-items: stretch;
             }
-
             .form-group {
                 width: 100%;
                 justify-content: space-between;
             }
-
             .conditions-grid {
                 grid-template-columns: 1fr;
             }
-
             .container {
                 padding: 5px;
             }
-
             body {
                 padding: 10px;
             }
-
             .monster-card {
                 padding: 15px;
             }
-
             .hp-text {
                 font-size: 16px;
             }
-
             .hp-inputs {
                 flex-direction: column;
                 align-items: flex-end;
             }
-
             .damage-controls {
                 flex-wrap: wrap;
             }
-
             .damage-btn, .heal-btn {
                 flex: 1;
                 min-width: 80px;
@@ -959,13 +810,9 @@
         }
     </style>
 </head>
-
 <body>
-    <!-- 主容器 -->
     <div class="container">
         <h1>战斗助手</h1>
-
-        <!-- 控制面板 -->
         <div class="controls-panel">
             <div class="monster-controls">
                 <button id="add-monster-btn">添加怪物</button>
@@ -990,13 +837,10 @@
                 </div>
             </div>
         </div>
-<!-- 怪物网格 -->
         <div id="monster-container" class="monster-grid">
             <div class="empty-state">点击上方按钮添加怪物或冒险者</div>
         </div>
     </div>
-
-    <!-- 状态选择器 -->
     <div class="status-selector" id="status-selector">
         <div class="status-panel">
             <div class="status-header">
@@ -1023,32 +867,22 @@
             </div>
         </div>
     </div>
-
-    <!-- 同步状态指示器 -->
     <div id="sync-status">
         <span class="sync-indicator"></span>
         <span class="sync-text">已同步</span>
     </div>
-
-    <!-- JavaScript逻辑 -->
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            // 后端API服务和WebSocket URL
             const API_URL = 'https://dnd-database.zeabur.app/api/v1/battles';
             const SOCKET_URL = 'https://dnd-database.zeabur.app';
-            
-            // 会话ID处理
             let sessionId = new URLSearchParams(window.location.search).get('session');
             if (!sessionId) {
-                // 增强随机性，确保在隐私模式下也能正常工作
                 const randomPart = Math.random().toString(36).substring(2, 12);
                 const timestampPart = Date.now().toString(36);
                 sessionId = randomPart + timestampPart;
                 window.history.pushState({}, '', `?session=${sessionId}`);
             }
             console.log("当前会话ID:", sessionId);
-
-            // 显示会话ID
             const sessionInfoDiv = document.createElement("div");
             sessionInfoDiv.id = "session-info";
             sessionInfoDiv.innerHTML = `
@@ -1057,8 +891,6 @@
             `;
             const title = document.querySelector('h1');
             title.parentNode.insertBefore(sessionInfoDiv, title.nextSibling);
-
-            // 全局变量
             let socket = null;
             let isConnected = false;
             let isLoadingData = false;
@@ -1069,8 +901,6 @@
             let dragSrcEl = null;
             let currentCardForStatus = null;
             let customConditionCounter = 1;
-
-            // DOM元素
             const monsterContainer = document.getElementById("monster-container");
             const addMonsterBtn = document.getElementById("add-monster-btn");
             const addAdventurerBtn = document.getElementById("add-adventurer-btn");
@@ -1088,21 +918,15 @@
             const customStatusName = document.getElementById("custom-status-name");
             const customStatusDesc = document.getElementById("custom-status-desc");
             const addCustomStatusBtn = document.getElementById("add-custom-status");
-
-            // 初始化Socket.io连接
             function initSocketConnection() {
                 socket = io(SOCKET_URL);
-                
                 socket.on('connect', () => {
                     console.log('已连接到服务器');
                     isConnected = true;
                     updateSyncStatus("success", "已连接");
                     setButtonsEnabled(true);
-                    
-                    // 加入会话
                     socket.emit('join-session', sessionId);
                 });
-                
                 socket.on('disconnect', () => {
                     console.log('与服务器断开连接');
                     isConnected = false;
@@ -1110,21 +934,18 @@
                     setButtonsEnabled(false);
                     showConnectionError();
                 });
-                
                 socket.on('monster-updated', (monsterData) => {
                     if (!isLoadingData && monsterData) {
                         console.log("收到怪物更新:", monsterData.id);
                         createCardFromData(monsterData);
                     }
                 });
-                
                 socket.on('session-updated', (data) => {
                     if (!isLoadingData && data) {
                         console.log("收到会话更新");
                         refreshUIFromData(data);
                     }
                 });
-
                 socket.on('delete-monster', (data) => {
                     if (data && data.monsterId) {
                         console.log("收到怪物删除通知:", data.monsterId);
@@ -1132,31 +953,18 @@
                     }
                 });
             }
-
-            // 初始化应用
             function initializeApp() {
                 console.log("初始化应用...");
-                
-                // 添加简单的安全检查
                 if (window.location.protocol !== 'https:' && !window.location.hostname.includes('localhost')) {
                     console.warn('警告: 应用未在HTTPS下运行，这可能导致安全问题');
                 }
-                
                 setButtonsEnabled(false);
                 showLoadingState("正在连接到服务器...");
                 updateSyncStatus("connecting", "正在连接");
-                
-                // 初始化Socket连接
                 initSocketConnection();
-                
-                // 加载初始数据
                 loadFromServer(true);
-                
-                // 设置复制会话链接
                 setupCopySessionLink();
             }
-
-            // 加载状态显示
             function showLoadingState(message = "正在加载战斗数据...") {
                 hideLoadingState();
                 const loadingDiv = document.createElement("div");
@@ -1167,13 +975,10 @@
                 `;
                 document.body.appendChild(loadingDiv);
             }
-
             function hideLoadingState() {
                 const existingLoader = document.getElementById("loading-indicator");
                 if (existingLoader) existingLoader.remove();
             }
-
-            // 错误处理
             function showConnectionError() {
                 hideErrorMessages();
                 const errorDiv = document.createElement("div");
@@ -1189,7 +994,6 @@
                     initializeApp();
                 });
             }
-
             function showLoadingError(error) {
                 hideErrorMessages();
                 const errorDiv = document.createElement("div");
@@ -1205,7 +1009,6 @@
                     loadFromServer(true);
                 });
             }
-
             function showSaveError(error) {
                 updateSyncStatus("error", "同步失败");
                 const errorDiv = document.createElement("div");
@@ -1224,23 +1027,18 @@
                     if (document.getElementById("save-error")) document.getElementById("save-error").remove();
                 }, 3000);
             }
-
             function hideErrorMessages() {
                 const errors = document.querySelectorAll('.error-message');
                 errors.forEach(error => error.remove());
             }
-
-            // 从服务器加载数据
             function loadFromServer(isInitialLoad = false) {
                 if (isLoadingData) return;
                 isLoadingData = true;
-                
                 if (isInitialLoad) {
                     showLoadingState("正在加载战斗数据...");
                     updateSyncStatus("syncing", "正在加载数据");
                 }
                 console.log("正在加载会话数据...");
-                
                 fetch(`${API_URL}/sessions/${sessionId}`)
                     .then(response => {
                         if (!response.ok) {
@@ -1268,14 +1066,11 @@
                         if (isInitialLoad) showLoadingError(error);
                     });
             }
-
-            // 更新UI显示从服务器获取的数据
             function refreshUIFromData(data) {
                 if (data && data.monsters) {
                     monsterContainer.innerHTML = '';
                     let maxMonsterNumber = 0;
                     let maxAdventurerNumber = 0;
-                    
                     const monstersArray = Object.values(data.monsters);
                     if (monstersArray.length > 0) {
                         monstersArray.forEach(monsterData => {
@@ -1297,25 +1092,18 @@
                     showEmptyState();
                 }
             }
-
-            // 保存数据到服务器
             function saveToServer(immediate = false) {
                 if (isLoadingData || !isConnected) return;
-                
                 if (pendingSaveTimer) {
                     clearTimeout(pendingSaveTimer);
                     pendingSaveTimer = null;
                 }
-                
                 if (!immediate) {
                     pendingSaveTimer = setTimeout(() => saveToServer(true), 500);
                     return;
                 }
-                
                 updateSyncStatus("syncing", "正在保存...");
                 console.log("正在保存会话数据...");
-                
-                // 收集所有怪物数据
                 const monstersMap = {};
                 document.querySelectorAll('.monster-card').forEach(card => {
                     const monsterId = card.dataset.id;
@@ -1329,10 +1117,7 @@
                         conditions: card.dataset.conditions || '[]',
                         isLocked: card.classList.contains('locked')
                     };
-                    
                     monstersMap[monsterId] = monsterData;
-                    
-                    // 通知其他客户端单个怪物更新
                     if (socket && socket.connected) {
                         socket.emit('update-monster', {
                             sessionId: sessionId,
@@ -1340,11 +1125,8 @@
                         });
                     }
                 });
-                
                 const saveTime = Date.now();
                 lastSaveTime = saveTime;
-                
-                // 保存整个会话数据
                 fetch(`${API_URL}/sessions/${sessionId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1373,8 +1155,6 @@
                     showSaveError(error);
                 });
             }
-
-            // 按钮状态控制
             function setButtonsEnabled(enabled) {
                 addAdventurerBtn.disabled = !enabled;
                 resetAllBtn.disabled = !enabled;
@@ -1385,8 +1165,6 @@
                 resetAllBtn.style.opacity = opacity;
                 manualSyncBtn.style.opacity = opacity;
             }
-
-            // 同步状态更新
             function updateSyncStatus(state, message) {
                 syncStatus.className = "show";
                 if (state === "syncing") syncStatus.classList.add("syncing");
@@ -1397,8 +1175,6 @@
                     setTimeout(() => syncStatus.classList.remove("show"), 2000);
                 }
             }
-
-            // 会话链接复制
             function setupCopySessionLink() {
                 document.getElementById("copy-session-link").addEventListener("click", () => {
                     const sessionLink = window.location.href;
@@ -1410,8 +1186,6 @@
                         });
                 });
             }
-
-            // 创建和更新卡片
             function createCardFromData(monsterData) {
                 if (!monsterData || !monsterData.id) return null;
                 const existingCard = document.querySelector(`.monster-card[data-id="${monsterData.id}"]`);
@@ -1425,14 +1199,12 @@
                 monsterContainer.appendChild(card);
                 return card;
             }
-
             function updateCardFromData(card, monsterData) {
                 if (!card || !monsterData) return;
                 if (monsterData.name) card.querySelector('.monster-name').textContent = monsterData.name;
                 if (monsterData.currentHp !== undefined) card.querySelector('.current-hp-input').value = monsterData.currentHp;
                 if (monsterData.maxHp) card.querySelector('.max-hp-input').value = monsterData.maxHp;
                 if (monsterData.tempHp !== undefined) card.querySelector('.temp-hp-input').value = monsterData.tempHp || 0;
-
                 if (monsterData.conditions) {
                     card.dataset.conditions = typeof monsterData.conditions === 'string' ? monsterData.conditions : JSON.stringify(monsterData.conditions);
                     try {
@@ -1448,21 +1220,18 @@
                         console.error("解析状态数据出错:", e);
                     }
                 }
-    
-    const lockButton = card.querySelector('.lock-button');
-    if (monsterData.isLocked) {
-        card.classList.add('locked');
-        lockButton.textContent = '🔒';
-        lockButton.title = '解锁卡片';
-    } else {
-        card.classList.remove('locked');
-        lockButton.textContent = '🔓';
-        lockButton.title = '锁定卡片';
-    }
-    updateHpBar(card);
-}
-
-
+                const lockButton = card.querySelector('.lock-button');
+                if (monsterData.isLocked) {
+                    card.classList.add('locked');
+                    lockButton.textContent = '🔒';
+                    lockButton.title = '解锁卡片';
+                } else {
+                    card.classList.remove('locked');
+                    lockButton.textContent = '🔓';
+                    lockButton.title = '锁定卡片';
+                }
+                updateHpBar(card);
+            }
             function removeMonsterById(id) {
                 const card = document.querySelector(`.monster-card[data-id="${id}"]`);
                 if (card) {
@@ -1470,8 +1239,6 @@
                     if (!monsterContainer.querySelectorAll('.monster-card').length) showEmptyState();
                 }
             }
-
-            // 状态定义
             const conditions = [
                 { id: "blinded", name: "目盲", desc: "无法视物，视觉相关检定失败。受攻击时对方有优势，自身攻击有劣势。" },
                 { id: "charmed", name: "魅惑", desc: "无法攻击魅惑者，魅惑者的社交检定有优势。" },
@@ -1489,15 +1256,12 @@
                 { id: "stunned", name: "震慑", desc: "无法行动说话，豁免失败，被攻击有优势。" },
                 { id: "unconscious", name: "昏迷", desc: "完全失去意识，近战攻击必暴击，豁免失败。" }
             ];
-
-            // 创建怪物卡片
             function createMonsterCard(name, maxHp, isAdventurer = false) {
                 const monsterId = `monster-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
                 const currentHp = maxHp;
                 const tempHp = 0;
                 const emptyState = monsterContainer.querySelector(".empty-state");
                 if (emptyState) emptyState.remove();
-
                 const monsterCard = document.createElement("div");
                 monsterCard.className = "monster-card";
                 monsterCard.dataset.id = monsterId;
@@ -1543,7 +1307,6 @@
                         <button class="heal-btn">治疗</button>
                     </div>
                 `;
-
                 monsterCard.querySelector(".delete-button").addEventListener("click", (e) => {
                     e.stopPropagation();
                     const monsterId = monsterCard.dataset.id;
@@ -1557,8 +1320,6 @@
                     }
                     saveToServer();
                 });
-
-
                 const lockButton = monsterCard.querySelector(".lock-button");
                 lockButton.addEventListener("click", (e) => {
                     e.stopPropagation();
@@ -1567,13 +1328,11 @@
                     lockButton.title = monsterCard.classList.contains("locked") ? "解锁卡片" : "锁定卡片";
                     saveToServer();
                 });
-
                 const statusButton = monsterCard.querySelector(".status-button");
                 statusButton.addEventListener("click", (e) => {
                     e.stopPropagation();
                     openStatusSelector(monsterCard);
                 });
-
                 const currentHpInput = monsterCard.querySelector(".current-hp-input");
                 currentHpInput.addEventListener("change", () => {
                     let newCurrentHp = parseInt(currentHpInput.value) || 0;
@@ -1583,7 +1342,6 @@
                     updateHpBar(monsterCard);
                     saveToServer();
                 });
-
                 const maxHpInput = monsterCard.querySelector(".max-hp-input");
                 maxHpInput.addEventListener("change", () => {
                     const newMaxHp = Math.max(1, parseInt(maxHpInput.value) || 1);
@@ -1594,7 +1352,6 @@
                     updateHpBar(monsterCard);
                     saveToServer();
                 });
-
                 const tempHpInput = monsterCard.querySelector(".temp-hp-input");
                 tempHpInput.addEventListener("change", () => {
                     let newTempHp = Math.max(0, parseInt(tempHpInput.value) || 0);
@@ -1602,33 +1359,25 @@
                     updateHpBar(monsterCard);
                     saveToServer();
                 });
-
                 const damageBtn = monsterCard.querySelector(".damage-btn");
                 damageBtn.addEventListener("click", () => applyDamage(monsterCard, true));
-
                 const healBtn = monsterCard.querySelector(".heal-btn");
                 healBtn.addEventListener("click", () => applyDamage(monsterCard, false));
-
                 const damageInput = monsterCard.querySelector(".damage-input");
                 damageInput.addEventListener("keypress", (e) => {
                     if (e.key === "Enter") applyDamage(monsterCard, true);
                 });
-
                 const monsterName = monsterCard.querySelector(".monster-name");
                 monsterName.addEventListener("blur", saveToServer);
                 monsterName.addEventListener("mousedown", (e) => e.stopPropagation());
-
                 monsterCard.addEventListener("dragstart", handleDragStart);
                 monsterCard.addEventListener("dragover", handleDragOver);
                 monsterCard.addEventListener("dragenter", handleDragEnter);
                 monsterCard.addEventListener("dragleave", handleDragLeave);
                 monsterCard.addEventListener("drop", handleDrop);
                 monsterCard.addEventListener("dragend", handleDragEnd);
-
                 return monsterCard;
             }
-
-            // 更新HP条
             function updateHpBar(monsterCard) {
                 const currentHp = parseInt(monsterCard.querySelector(".current-hp-input").value) || 0;
                 const maxHp = parseInt(monsterCard.querySelector(".max-hp-input").value) || 1;
@@ -1637,12 +1386,10 @@
                 const tempHpBar = monsterCard.querySelector(".temp-hp-bar");
                 const hpBarText = monsterCard.querySelector(".hp-bar-text");
                 const statusBadge = monsterCard.querySelector(".status-badge");
-
                 const hpPercentage = (currentHp / maxHp) * 100;
                 hpBarFill.style.width = `${hpPercentage}%`;
                 tempHpBar.style.width = tempHp > 0 ? `${(tempHp / maxHp) * 100}%` : "0";
                 hpBarText.textContent = tempHp > 0 ? `${currentHp}/${maxHp} (+${tempHp})` : `${currentHp}/${maxHp}`;
-
                 hpBarFill.style.backgroundColor = hpPercentage > 50 ? "var(--green)" : hpPercentage > 20 ? "var(--yellow)" : "var(--orange)";
                 if (currentHp <= 0) {
                     statusBadge.textContent = "死亡";
@@ -1654,20 +1401,16 @@
                     monsterCard.style.opacity = "1";
                 }
             }
-
-            // 应用伤害或治疗
             function applyDamage(monsterCard, isDamage) {
                 const damageInput = monsterCard.querySelector(".damage-input");
                 const value = parseInt(damageInput.value) || 0;
                 if (value <= 0) return;
-
                 const currentHpInput = monsterCard.querySelector(".current-hp-input");
                 const maxHpInput = monsterCard.querySelector(".max-hp-input");
                 const tempHpInput = monsterCard.querySelector(".temp-hp-input");
                 let currentHp = parseInt(currentHpInput.value) || 0;
                 const maxHp = parseInt(maxHpInput.value) || 1;
                 let tempHp = parseInt(tempHpInput.value) || 0;
-
                 if (isDamage) {
                     if (tempHp > 0) {
                         if (tempHp >= value) {
@@ -1686,22 +1429,17 @@
                     currentHp = Math.min(maxHp, currentHp + value);
                     currentHpInput.value = currentHp;
                 }
-
                 updateHpBar(monsterCard);
                 damageInput.value = "";
                 damageInput.focus();
                 saveToServer();
             }
-
-            // 显示空状态
             function showEmptyState() {
                 const emptyState = document.createElement("div");
                 emptyState.className = "empty-state";
                 emptyState.textContent = "点击上方按钮添加怪物或冒险者";
                 monsterContainer.appendChild(emptyState);
             }
-
-            // 状态选择器逻辑
             function openStatusSelector(card) {
                 currentCardForStatus = card;
                 conditionsGrid.innerHTML = "";
@@ -1711,7 +1449,6 @@
                 } catch (e) {
                     console.error("解析状态数据出错:", e);
                 }
-
                 conditions.forEach(condition => addConditionToGrid(condition, currentConditions.includes(condition.id)));
                 document.querySelectorAll(`.condition-tag.custom[data-card-id="${card.dataset.id}"]`).forEach(stateEl => {
                     const id = stateEl.dataset.id;
@@ -1719,12 +1456,10 @@
                         addConditionToGrid({ id, name: stateEl.textContent, desc: stateEl.title || '', custom: true }, true);
                     }
                 });
-
                 customStatusName.value = "";
                 customStatusDesc.value = "";
                 statusSelector.classList.add("active");
             }
-
             function addConditionToGrid(condition, isSelected = false) {
                 const conditionEl = document.createElement("div");
                 conditionEl.className = `condition-item ${isSelected ? "selected" : ""} ${condition.custom ? "custom-condition" : ""}`;
@@ -1740,12 +1475,10 @@
                 });
                 conditionsGrid.appendChild(conditionEl);
             }
-
             function closeStatusSelector() {
                 statusSelector.classList.remove("active");
                 currentCardForStatus = null;
             }
-
             function applySelectedStatus() {
                 if (!currentCardForStatus) return;
                 const selectedConditions = Array.from(conditionsGrid.querySelectorAll(".condition-item.selected")).map(item => ({
@@ -1759,7 +1492,6 @@
                 closeStatusSelector();
                 saveToServer();
             }
-
             function updateConditionTags(card, conditionObjects) {
                 const tagsContainer = card.querySelector(".tags-container");
                 Array.from(tagsContainer.children).forEach(child => {
@@ -1778,8 +1510,6 @@
                     tagsContainer.appendChild(tag);
                 });
             }
-
-            // 拖放功能
             function handleDragStart(e) {
                 if (this.classList.contains("locked")) {
                     e.preventDefault();
@@ -1790,21 +1520,17 @@
                 e.dataTransfer.effectAllowed = 'move';
                 e.dataTransfer.setData('text/html', this.innerHTML);
             }
-
             function handleDragOver(e) {
                 if (e.preventDefault) e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
                 return false;
             }
-
             function handleDragEnter() {
                 this.classList.add('drag-over');
             }
-
             function handleDragLeave() {
                 this.classList.remove('drag-over');
             }
-
             function handleDrop(e) {
                 if (e.stopPropagation) e.stopPropagation();
                 if (!dragSrcEl || dragSrcEl.classList.contains("locked") || this.classList.contains("locked")) return false;
@@ -1821,13 +1547,10 @@
                 }
                 return false;
             }
-
             function handleDragEnd() {
                 this.style.opacity = '1';
                 document.querySelectorAll('.monster-card').forEach(card => card.classList.remove('drag-over'));
             }
-
-            // 事件监听
             addMonsterBtn.addEventListener("click", () => {
                 if (!isConnected) return alert("未连接到服务器，请检查网络连接并刷新页面");
                 const name = `${monsterNamePrefix.value} ${monsterCounter++}`;
@@ -1835,7 +1558,6 @@
                 monsterContainer.appendChild(createMonsterCard(name, maxHp, false));
                 saveToServer();
             });
-
             addAdventurerBtn.addEventListener("click", () => {
                 if (!isConnected) return alert("未连接到服务器，请检查网络连接并刷新页面");
                 const name = `${adventurerNamePrefix.value} ${adventurerCounter++}`;
@@ -1843,7 +1565,6 @@
                 monsterContainer.appendChild(createMonsterCard(name, maxHp, true));
                 saveToServer();
             });
-
             resetAllBtn.addEventListener("click", () => {
                 if (!isConnected) return alert("未连接到服务器，请检查网络连接并刷新页面");
                 if (confirm("确定要移除所有非锁定的怪物和冒险者吗？")) {
@@ -1852,7 +1573,6 @@
                     saveToServer();
                 }
             });
-
             manualSyncBtn.addEventListener("click", () => {
                 if (!isConnected) return alert("未连接到服务器，请检查网络连接并刷新页面");
                 manualSyncBtn.classList.add("syncing");
@@ -1863,14 +1583,12 @@
                     setTimeout(() => manualSyncBtn.classList.remove("syncing"), 1000);
                 }, 1000);
             });
-
             closeStatusBtn.addEventListener("click", closeStatusSelector);
             cancelStatusBtn.addEventListener("click", closeStatusSelector);
             applyStatusBtn.addEventListener("click", applySelectedStatus);
             statusSelector.addEventListener("click", (e) => {
                 if (e.target === statusSelector) closeStatusSelector();
             });
-
             addCustomStatusBtn.addEventListener("click", () => {
                 const name = customStatusName.value.trim();
                 const desc = customStatusDesc.value.trim();
@@ -1881,16 +1599,12 @@
                 customStatusDesc.value = "";
                 customStatusName.focus();
             });
-
             customStatusName.addEventListener("keypress", (e) => {
                 if (e.key === "Enter") customStatusDesc.focus();
             });
-
             customStatusDesc.addEventListener("keypress", (e) => {
                 if (e.key === "Enter") addCustomStatusBtn.click();
             });
-
-            // 网络状态监听
             window.addEventListener('online', () => {
                 console.log('网络已连接');
                 if (!isConnected) {
@@ -1898,22 +1612,18 @@
                     setTimeout(() => initializeApp(), 1000);
                 }
             });
-
             window.addEventListener('offline', () => {
                 console.log('网络连接已断开');
                 updateSyncStatus("error", "网络已断开");
                 isConnected = false;
                 setButtonsEnabled(false);
             });
-
             document.addEventListener('visibilitychange', () => {
                 if (document.visibilityState === 'visible' && isConnected) {
                     console.log('页面恢复前台，检查连接状态');
                     loadFromServer();
                 }
             });
-
-            // 自动保存
             let autoSaveInterval;
             function setupAutoSave() {
                 if (autoSaveInterval) clearInterval(autoSaveInterval);
@@ -1924,8 +1634,6 @@
                     }
                 }, 30000);
             }
-
-            // 启动应用
             initializeApp();
             setupAutoSave();
         });

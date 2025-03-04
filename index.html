@@ -885,10 +885,7 @@
             console.log("当前会话ID:", sessionId);
             const sessionInfoDiv = document.createElement("div");
             sessionInfoDiv.id = "session-info";
-            sessionInfoDiv.innerHTML = `
-                会话ID: <span id="session-id">${sessionId}</span>
-                <button id="copy-session-link">复制链接</button>
-            `;
+            sessionInfoDiv.innerHTML = ` 会话ID: <span id="session-id">${sessionId}</span> <button id="copy-session-link">复制链接</button> `;
             const title = document.querySelector('h1');
             title.parentNode.insertBefore(sessionInfoDiv, title.nextSibling);
             let socket = null;
@@ -952,6 +949,12 @@
                         removeMonsterById(data.monsterId);
                     }
                 });
+                socket.on('monsters-reordered', (data) => {
+                    if (!isLoadingData && data && data.order) {
+                        console.log("收到卡片顺序更新");
+                        reorderMonsterCards(data.order);
+                    }
+                });
             }
             function initializeApp() {
                 console.log("初始化应用...");
@@ -969,10 +972,7 @@
                 hideLoadingState();
                 const loadingDiv = document.createElement("div");
                 loadingDiv.id = "loading-indicator";
-                loadingDiv.innerHTML = `
-                    <div class="loading-spinner"></div>
-                    <p class="loading-text">${message}</p>
-                `;
+                loadingDiv.innerHTML = ` <div class="loading-spinner"></div> <p class="loading-text">${message}</p> `;
                 document.body.appendChild(loadingDiv);
             }
             function hideLoadingState() {
@@ -984,10 +984,7 @@
                 const errorDiv = document.createElement("div");
                 errorDiv.id = "connection-error";
                 errorDiv.className = "error-message";
-                errorDiv.innerHTML = `
-                    <p>无法连接到服务器，请检查网络连接。</p>
-                    <button id="retry-connection-btn">重试连接</button>
-                `;
+                errorDiv.innerHTML = ` <p>无法连接到服务器，请检查网络连接。</p> <button id="retry-connection-btn">重试连接</button> `;
                 document.querySelector('.container').appendChild(errorDiv);
                 document.getElementById("retry-connection-btn").addEventListener("click", () => {
                     errorDiv.remove();
@@ -999,10 +996,7 @@
                 const errorDiv = document.createElement("div");
                 errorDiv.id = "loading-error";
                 errorDiv.className = "error-message";
-                errorDiv.innerHTML = `
-                    <p>加载数据失败: ${error.message || "未知错误"}</p>
-                    <button id="retry-loading-btn">重试加载</button>
-                `;
+                errorDiv.innerHTML = ` <p>加载数据失败: ${error.message || "未知错误"}</p> <button id="retry-loading-btn">重试加载</button> `;
                 document.querySelector('.container').appendChild(errorDiv);
                 document.getElementById("retry-loading-btn").addEventListener("click", () => {
                     errorDiv.remove();
@@ -1014,10 +1008,7 @@
                 const errorDiv = document.createElement("div");
                 errorDiv.id = "save-error";
                 errorDiv.className = "error-message";
-                errorDiv.innerHTML = `
-                    <p>保存数据失败: ${error.message || "未知错误"}</p>
-                    <button id="retry-save-btn">重试保存</button>
-                `;
+                errorDiv.innerHTML = ` <p>保存数据失败: ${error.message || "未知错误"}</p> <button id="retry-save-btn">重试保存</button> `;
                 document.querySelector('.container').appendChild(errorDiv);
                 document.getElementById("retry-save-btn").addEventListener("click", () => {
                     errorDiv.remove();
@@ -1099,7 +1090,7 @@
                     pendingSaveTimer = null;
                 }
                 if (!immediate) {
-                    pendingSaveTimer = setTimeout(() => saveToServer(true), 500);
+                    pendingSaveTimer = setTimeout(() => saveToServer(true), 300);
                     return;
                 }
                 updateSyncStatus("syncing", "正在保存...");
@@ -1119,12 +1110,13 @@
                     };
                     monstersMap[monsterId] = monsterData;
                     if (socket && socket.connected) {
-                        socket.emit('update-monster', {
-                            sessionId: sessionId,
-                            monster: monsterData
-                        });
+                        socket.emit('update-monster', { sessionId: sessionId, monster: monsterData });
                     }
                 });
+                if (socket && socket.connected) {
+                    const sessionData = { monsters: monstersMap };
+                    socket.emit('session-update', { sessionId: sessionId, data: sessionData });
+                }
                 const saveTime = Date.now();
                 lastSaveTime = saveTime;
                 fetch(`${API_URL}/sessions/${sessionId}`, {
@@ -1132,28 +1124,28 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ monsters: monstersMap })
                 })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP错误! 状态: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(result => {
-                    if (saveTime === lastSaveTime) {
-                        if (result.success) {
-                            console.log("数据保存成功");
-                            updateSyncStatus("success", "已保存");
-                        } else {
-                            console.error("保存失败:", result.error);
-                            updateSyncStatus("error", "保存失败");
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP错误! 状态: ${response.status}`);
                         }
-                    }
-                })
-                .catch(error => {
-                    console.error("保存数据出错:", error);
-                    updateSyncStatus("error", "保存失败");
-                    showSaveError(error);
-                });
+                        return response.json();
+                    })
+                    .then(result => {
+                        if (saveTime === lastSaveTime) {
+                            if (result.success) {
+                                console.log("数据保存成功");
+                                updateSyncStatus("success", "已保存");
+                            } else {
+                                console.error("保存失败:", result.error);
+                                updateSyncStatus("error", "保存失败");
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error("保存数据出错:", error);
+                        updateSyncStatus("error", "保存失败");
+                        showSaveError(error);
+                    });
             }
             function setButtonsEnabled(enabled) {
                 addAdventurerBtn.disabled = !enabled;
@@ -1239,6 +1231,28 @@
                     if (!monsterContainer.querySelectorAll('.monster-card').length) showEmptyState();
                 }
             }
+            function reorderMonsterCards(orderIds) {
+                if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) return;
+                const currentCards = {};
+                document.querySelectorAll('.monster-card').forEach(card => {
+                    currentCards[card.dataset.id] = card;
+                });
+                const tempContainer = document.createDocumentFragment();
+                orderIds.forEach(id => {
+                    if (currentCards[id]) {
+                        tempContainer.appendChild(currentCards[id]);
+                        delete currentCards[id];
+                    }
+                });
+                Object.values(currentCards).forEach(card => {
+                    tempContainer.appendChild(card);
+                });
+                monsterContainer.innerHTML = '';
+                monsterContainer.appendChild(tempContainer);
+                if (!monsterContainer.querySelector('.monster-card')) {
+                    showEmptyState();
+                }
+            }
             const conditions = [
                 { id: "blinded", name: "目盲", desc: "无法视物，视觉相关检定失败。受攻击时对方有优势，自身攻击有劣势。" },
                 { id: "charmed", name: "魅惑", desc: "无法攻击魅惑者，魅惑者的社交检定有优势。" },
@@ -1311,14 +1325,11 @@
                     e.stopPropagation();
                     const monsterId = monsterCard.dataset.id;
                     monsterCard.remove();
-                    if (!monsterContainer.children.length) showEmptyState();
+                    if (!monsterContainer.querySelectorAll('.monster-card').length) showEmptyState();
                     if (socket && socket.connected) {
-                        socket.emit('delete-monster', {
-                            sessionId: sessionId,
-                            monsterId: monsterId
-                        });
+                        socket.emit('delete-monster', { sessionId: sessionId, monsterId: monsterId });
                     }
-                    saveToServer();
+                    saveToServer(true);
                 });
                 const lockButton = monsterCard.querySelector(".lock-button");
                 lockButton.addEventListener("click", (e) => {
@@ -1464,10 +1475,7 @@
                 const conditionEl = document.createElement("div");
                 conditionEl.className = `condition-item ${isSelected ? "selected" : ""} ${condition.custom ? "custom-condition" : ""}`;
                 conditionEl.dataset.id = condition.id;
-                conditionEl.innerHTML = `
-                    <div class="condition-name">${condition.name}<span>${isSelected ? "✓" : ""}</span></div>
-                    <div class="condition-desc">${condition.desc || ''}</div>
-                `;
+                conditionEl.innerHTML = ` <div class="condition-name">${condition.name}<span>${isSelected ? "✓" : ""}</span></div> <div class="condition-desc">${condition.desc || ''}</div> `;
                 conditionEl.addEventListener("click", () => {
                     conditionEl.classList.toggle("selected");
                     const checkmark = conditionEl.querySelector(".condition-name span");
@@ -1498,9 +1506,7 @@
                     if (!child.classList.contains("status-badge")) child.remove();
                 });
                 conditionObjects.forEach(condition => {
-                    let fullCondition = condition.id && !condition.name
-                        ? (conditions.find(c => c.id === condition.id) || { id: condition.id, name: condition.id.startsWith('custom-') ? condition.id.split('-')[1] || "自定义" : condition.id, desc: "", custom: condition.id.startsWith('custom-') })
-                        : condition;
+                    let fullCondition = condition.id && !condition.name ? (conditions.find(c => c.id === condition.id) || { id: condition.id, name: condition.id.startsWith('custom-') ? condition.id.split('-')[1] || "自定义" : condition.id, desc: "", custom: condition.id.startsWith('custom-') }) : condition;
                     const tag = document.createElement("span");
                     tag.className = fullCondition.custom ? "condition-tag custom" : "condition-tag";
                     tag.dataset.id = fullCondition.id;
@@ -1543,7 +1549,11 @@
                     } else {
                         monsterContainer.insertBefore(dragSrcEl, this);
                     }
-                    saveToServer();
+                    const newOrderIds = Array.from(monsterContainer.querySelectorAll('.monster-card')).map(card => card.dataset.id);
+                    if (socket && socket.connected) {
+                        socket.emit('reorder-monsters', { sessionId: sessionId, order: newOrderIds });
+                    }
+                    saveToServer(true);
                 }
                 return false;
             }

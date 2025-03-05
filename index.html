@@ -282,7 +282,7 @@
         }
         .card-actions {
             display: flex;
-            gap: 8px;
+            gap: 4px;
         }
         .card-action-btn {
             background-color: transparent;
@@ -762,43 +762,6 @@
             border-radius: 50%;
             background-color: var(--green);
         }
-        .monster-card.touch-dragging {
-            opacity: 0.8;
-            transform: scale(1.02);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-            position: relative;
-            z-index: 10;
-        }
-        .drag-placeholder {
-            height: 0;
-            border-top: 2px dashed var(--blue);
-            margin: 10px 0;
-            transition: all 0.2s;
-        }
-        .monster-card.draggable::after {
-            content: '长按拖动';
-            position: absolute;
-            bottom: 5px;
-            right: 5px;
-            font-size: 10px;
-            padding: 3px 6px;
-            background-color: rgba(0,0,0,0.07);
-            border-radius: 4px;
-            color: var(--text-light);
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        .monster-card:not(.locked):hover::after {
-            opacity: 1;
-        }
-        .monster-card.touch-feedback {
-            animation: pulse 0.5s;
-        }
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.03); }
-            100% { transform: scale(1); }
-        }
         .condition-tooltip {
             position: fixed;
             background-color: white;
@@ -863,29 +826,41 @@
             justify-content: center;
             opacity: 0.7;
         }
-        @media (pointer: coarse) {
-            .monster-card:not(.locked)::after {
-                opacity: 1;
-            }
-            .monster-card {
-                touch-action: none;
-            }
-            .condition-tag {
-                padding: 4px 10px;
-                margin: 3px;
-            }
-            .condition-tooltip {
-                width: 85%;
-                max-width: 350px;
-                padding: 15px;
-                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-            }
-            .condition-tooltip-close {
-                top: 8px;
-                right: 8px;
-                width: 20px;
-                height: 20px;
-            }
+        .sort-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-right: 4px;
+        }
+        .sort-btn {
+            background-color: var(--blue);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            padding: 0;
+        }
+        .sort-btn:hover {
+            transform: scale(1.1);
+            background-color: #0b7dda;
+        }
+        .sort-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .up-btn::after {
+            content: "↑";
+        }
+        .down-btn::after {
+            content: "↓";
         }
         @media (max-width: 767px) {
             .monster-grid {
@@ -932,6 +907,22 @@
                 flex: 1;
                 min-width: 80px;
             }
+            .condition-tag {
+                padding: 4px 10px;
+                margin: 3px;
+            }
+            .condition-tooltip {
+                width: 85%;
+                max-width: 350px;
+                padding: 15px;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            }
+            .condition-tooltip-close {
+                top: 8px;
+                right: 8px;
+                width: 20px;
+                height: 20px;
+            }
         }
     </style>
 </head>
@@ -976,7 +967,8 @@
                 <div class="custom-status-title">
                     <svg viewBox="0 0 24 24">
                         <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
-                    </svg> 添加自定义状态
+                    </svg>
+                    添加自定义状态
                 </div>
                 <div class="custom-status-inputs">
                     <input type="text" class="custom-status-input" id="custom-status-name" placeholder="状态名称">
@@ -1019,7 +1011,6 @@
             let pendingSaveTimer = null;
             let monsterCounter = 1;
             let adventurerCounter = 1;
-            let dragSrcEl = null;
             let currentCardForStatus = null;
             let customConditionCounter = 1;
             const monsterContainer = document.getElementById("monster-container");
@@ -1083,139 +1074,6 @@
                 conditionTooltip.classList.remove('visible');
                 activeTooltip = null;
             }
-            function setupTouchDragSupport() {
-                const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-                if (!isTouchDevice) return;
-                console.log("检测到触摸设备，启用触摸拖拽支持");
-                let touchDragCard = null;
-                let dragPlaceholder = null;
-                let startY = 0;
-                let scrollStartY = 0;
-                let longPressTimer = null;
-                let isDragging = false;
-                function createPlaceholder() {
-                    const placeholder = document.createElement('div');
-                    placeholder.className = 'drag-placeholder';
-                    return placeholder;
-                }
-                function startTouchDrag(card, clientY) {
-                    if (card.classList.contains('locked')) return;
-                    touchDragCard = card;
-                    isDragging = true;
-                    startY = clientY;
-                    scrollStartY = window.scrollY;
-                    card.classList.add('touch-dragging');
-                    dragPlaceholder = createPlaceholder();
-                    card.parentNode.insertBefore(dragPlaceholder, card);
-                    updateDragPosition(clientY);
-                }
-                function endTouchDrag() {
-                    if (!touchDragCard) return;
-                    touchDragCard.classList.remove('touch-dragging');
-                    if (dragPlaceholder && dragPlaceholder.parentNode) {
-                        dragPlaceholder.parentNode.insertBefore(touchDragCard, dragPlaceholder);
-                        dragPlaceholder.remove();
-                    }
-                    const newOrderIds = Array.from(monsterContainer.querySelectorAll('.monster-card')).map(card => card.dataset.id);
-                    if (socket && socket.connected) {
-                        socket.emit('reorder-monsters', { sessionId: sessionId, order: newOrderIds });
-                    }
-                    saveToServer(true);
-                    touchDragCard = null;
-                    dragPlaceholder = null;
-                    isDragging = false;
-                }
-                function updateDragPosition(clientY) {
-                    if (!touchDragCard || !dragPlaceholder) return;
-                    const currentY = clientY;
-                    const deltaY = currentY - startY + (window.scrollY - scrollStartY);
-                    const cards = Array.from(monsterContainer.querySelectorAll('.monster-card:not(.touch-dragging)'));
-                    let closestCard = null;
-                    let minDistance = Number.MAX_VALUE;
-                    const dragCardRect = touchDragCard.getBoundingClientRect();
-                    const dragCardCenter = dragCardRect.top + dragCardRect.height / 2;
-                    cards.forEach(card => {
-                        const rect = card.getBoundingClientRect();
-                        const cardCenter = rect.top + rect.height / 2;
-                        const distance = Math.abs(cardCenter - dragCardCenter);
-                        if (distance < minDistance) {
-                            minDistance = distance;
-                            closestCard = card;
-                        }
-                    });
-                    if (closestCard) {
-                        const closestRect = closestCard.getBoundingClientRect();
-                        const closestCardCenter = closestRect.top + closestRect.height / 2;
-                        if (dragCardCenter < closestCardCenter) {
-                            monsterContainer.insertBefore(dragPlaceholder, closestCard);
-                        } else {
-                            monsterContainer.insertBefore(dragPlaceholder, closestCard.nextSibling);
-                        }
-                    }
-                }
-                function addTouchEvents(card) {
-                    card.addEventListener('touchstart', (e) => {
-                        if (card.classList.contains('locked')) return;
-                        if (longPressTimer) clearTimeout(longPressTimer);
-                        longPressTimer = setTimeout(() => {
-                            card.classList.add('touch-feedback');
-                            setTimeout(() => card.classList.remove('touch-feedback'), 300);
-                            startTouchDrag(card, e.touches[0].clientY);
-                        }, 750);
-                    }, { passive: true });
-                    card.addEventListener('touchmove', (e) => {
-                        if (longPressTimer && !isDragging) {
-                            clearTimeout(longPressTimer);
-                            longPressTimer = null;
-                        }
-                        if (isDragging && touchDragCard === card) {
-                            e.preventDefault();
-                            updateDragPosition(e.touches[0].clientY);
-                        }
-                    }, { passive: false });
-                    card.addEventListener('touchend', () => {
-                        if (longPressTimer) {
-                            clearTimeout(longPressTimer);
-                            longPressTimer = null;
-                        }
-                        if (isDragging && touchDragCard === card) {
-                            endTouchDrag();
-                        }
-                    });
-                    card.addEventListener('touchcancel', () => {
-                        if (longPressTimer) {
-                            clearTimeout(longPressTimer);
-                            longPressTimer = null;
-                        }
-                        if (isDragging && touchDragCard === card) {
-                            endTouchDrag();
-                        }
-                    });
-                    if (!card.classList.contains('locked')) {
-                        card.classList.add('draggable');
-                    }
-                }
-                const observer = new MutationObserver((mutations) => {
-                    mutations.forEach(mutation => {
-                        if (mutation.type === 'childList') {
-                            mutation.addedNodes.forEach(node => {
-                                if (node.nodeType === 1 && node.classList && node.classList.contains('monster-card')) {
-                                    addTouchEvents(node);
-                                }
-                            });
-                        }
-                    });
-                });
-                observer.observe(monsterContainer, { childList: true });
-                document.querySelectorAll('.monster-card').forEach(addTouchEvents);
-            }
-            function updateDraggableClass(card) {
-                if (card.classList.contains('locked')) {
-                    card.classList.remove('draggable');
-                } else {
-                    card.classList.add('draggable');
-                }
-            }
             function initSocketConnection() {
                 socket = io(SOCKET_URL);
                 socket.on('connect', () => {
@@ -1265,7 +1123,6 @@
                 setButtonsEnabled(false);
                 showLoadingState("正在连接到服务器...");
                 updateSyncStatus("connecting", "正在连接");
-                setupTouchDragSupport();
                 initSocketConnection();
                 loadFromServer(true);
                 setupCopySessionLink();
@@ -1378,6 +1235,7 @@
                         });
                         monsterCounter = maxMonsterNumber + 1;
                         adventurerCounter = maxAdventurerNumber + 1;
+                        updateSortButtonStatus();
                     } else {
                         showEmptyState();
                     }
@@ -1491,6 +1349,7 @@
                 card.dataset.id = monsterData.id;
                 updateCardFromData(card, monsterData);
                 monsterContainer.appendChild(card);
+                updateSortButtonStatus();
                 return card;
             }
             function updateCardFromData(card, monsterData) {
@@ -1524,7 +1383,6 @@
                     lockButton.textContent = '🔓';
                     lockButton.title = '锁定卡片';
                 }
-                updateDraggableClass(card);
                 updateHpBar(card);
             }
             function removeMonsterById(id) {
@@ -1532,6 +1390,7 @@
                 if (card) {
                     card.remove();
                     if (!monsterContainer.querySelectorAll('.monster-card').length) showEmptyState();
+                    updateSortButtonStatus();
                 }
             }
             function reorderMonsterCards(orderIds) {
@@ -1555,6 +1414,7 @@
                 if (!monsterContainer.querySelector('.monster-card')) {
                     showEmptyState();
                 }
+                updateSortButtonStatus();
             }
             const conditions = [
                 { id: "blinded", name: "目盲", desc: "无法视物，视觉相关检定失败。受攻击时对方有优势，自身攻击有劣势。" },
@@ -1584,8 +1444,7 @@
                 monsterCard.dataset.id = monsterId;
                 monsterCard.dataset.type = isAdventurer ? "adventurer" : "monster";
                 monsterCard.dataset.conditions = "[]";
-                monsterCard.setAttribute("draggable", "true");
-                monsterCard.innerHTML = ` <div class="monster-header"> <div class="monster-info"> <div class="monster-name" contenteditable="true">${name}</div> <div class="tags-container"> <span class="status-badge">存活</span> </div> </div> <div class="card-actions"> <button class="card-action-btn status-button" title="管理状态">⚡</button> <button class="card-action-btn lock-button" title="锁定卡片">🔓</button> <button class="card-action-btn delete-button" title="删除">×</button> </div> </div> <div class="hp-display"> <span class="hp-text">HP:</span> <div class="hp-inputs"> <input type="number" class="hp-input current-hp-input" value="${currentHp}" min="0" title="当前生命值"> <span>/</span> <input type="number" class="hp-input max-hp-input" value="${maxHp}" min="1" title="最大生命值"> </div> </div> <div class="temp-hp-display"> <span class="temp-hp-text">临时HP:</span> <input type="number" class="temp-hp-input" value="${tempHp}" min="0" title="临时生命值"> </div> <div class="hp-bar-container"> <div class="hp-bar"> <div class="hp-bar-fill" style="width: 100%"></div> </div> <div class="temp-hp-bar" style="width: 0%"></div> <div class="hp-bar-text">${currentHp}/${maxHp}</div> </div> <div class="damage-controls"> <input type="number" class="damage-input" placeholder="数值" min="0"> <button class="damage-btn">伤害</button> <button class="heal-btn">治疗</button> </div> `;
+                monsterCard.innerHTML = ` <div class="monster-header"> <div class="monster-info"> <div class="monster-name" contenteditable="true">${name}</div> <div class="tags-container"> <span class="status-badge">存活</span> </div> </div> <div class="card-actions"> <div class="sort-buttons"> <button class="sort-btn up-btn" title="上移"></button> <button class="sort-btn down-btn" title="下移"></button> </div> <button class="card-action-btn status-button" title="管理状态">⚡</button> <button class="card-action-btn lock-button" title="锁定卡片">🔓</button> <button class="card-action-btn delete-button" title="删除">×</button> </div> </div> <div class="hp-display"> <span class="hp-text">HP:</span> <div class="hp-inputs"> <input type="number" class="hp-input current-hp-input" value="${currentHp}" min="0" title="当前生命值"> <span>/</span> <input type="number" class="hp-input max-hp-input" value="${maxHp}" min="1" title="最大生命值"> </div> </div> <div class="temp-hp-display"> <span class="temp-hp-text">临时HP:</span> <input type="number" class="temp-hp-input" value="${tempHp}" min="0" title="临时生命值"> </div> <div class="hp-bar-container"> <div class="hp-bar"> <div class="hp-bar-fill" style="width: 100%"></div> </div> <div class="temp-hp-bar" style="width: 0%"></div> <div class="hp-bar-text">${currentHp}/${maxHp}</div> </div> <div class="damage-controls"> <input type="number" class="damage-input" placeholder="数值" min="0"> <button class="damage-btn">伤害</button> <button class="heal-btn">治疗</button> </div> `;
                 monsterCard.querySelector(".delete-button").addEventListener("click", (e) => {
                     e.stopPropagation();
                     const monsterId = monsterCard.dataset.id;
@@ -1594,6 +1453,7 @@
                     if (socket && socket.connected) {
                         socket.emit('delete-monster', { sessionId: sessionId, monsterId: monsterId });
                     }
+                    updateSortButtonStatus();
                     saveToServer(true);
                 });
                 const lockButton = monsterCard.querySelector(".lock-button");
@@ -1602,13 +1462,22 @@
                     monsterCard.classList.toggle("locked");
                     lockButton.textContent = monsterCard.classList.contains("locked") ? "🔒" : "🔓";
                     lockButton.title = monsterCard.classList.contains("locked") ? "解锁卡片" : "锁定卡片";
-                    updateDraggableClass(monsterCard);
                     saveToServer();
                 });
                 const statusButton = monsterCard.querySelector(".status-button");
                 statusButton.addEventListener("click", (e) => {
                     e.stopPropagation();
                     openStatusSelector(monsterCard);
+                });
+                const upButton = monsterCard.querySelector(".up-btn");
+                upButton.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    moveCardUp(monsterCard);
+                });
+                const downButton = monsterCard.querySelector(".down-btn");
+                downButton.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    moveCardDown(monsterCard);
                 });
                 const currentHpInput = monsterCard.querySelector(".current-hp-input");
                 currentHpInput.addEventListener("change", () => {
@@ -1647,16 +1516,39 @@
                 const monsterName = monsterCard.querySelector(".monster-name");
                 monsterName.addEventListener("blur", saveToServer);
                 monsterName.addEventListener("mousedown", (e) => e.stopPropagation());
-                monsterCard.addEventListener("dragstart", handleDragStart);
-                monsterCard.addEventListener("dragover", handleDragOver);
-                monsterCard.addEventListener("dragenter", handleDragEnter);
-                monsterCard.addEventListener("dragleave", handleDragLeave);
-                monsterCard.addEventListener("drop", handleDrop);
-                monsterCard.addEventListener("dragend", handleDragEnd);
-                if (!monsterCard.classList.contains('locked')) {
-                    monsterCard.classList.add('draggable');
-                }
                 return monsterCard;
+            }
+            function moveCardUp(card) {
+                const prevCard = card.previousElementSibling;
+                if (prevCard && prevCard.classList.contains('monster-card')) {
+                    monsterContainer.insertBefore(card, prevCard);
+                    saveCardOrder();
+                    updateSortButtonStatus();
+                }
+            }
+            function moveCardDown(card) {
+                const nextCard = card.nextElementSibling;
+                if (nextCard && nextCard.classList.contains('monster-card')) {
+                    monsterContainer.insertBefore(nextCard, card);
+                    saveCardOrder();
+                    updateSortButtonStatus();
+                }
+            }
+            function saveCardOrder() {
+                const newOrderIds = Array.from(monsterContainer.querySelectorAll('.monster-card')).map(card => card.dataset.id);
+                if (socket && socket.connected) {
+                    socket.emit('reorder-monsters', { sessionId: sessionId, order: newOrderIds });
+                }
+                saveToServer(true);
+            }
+            function updateSortButtonStatus() {
+                const cards = Array.from(monsterContainer.querySelectorAll('.monster-card'));
+                cards.forEach((card, index) => {
+                    const upBtn = card.querySelector('.up-btn');
+                    const downBtn = card.querySelector('.down-btn');
+                    upBtn.disabled = index === 0;
+                    downBtn.disabled = index === cards.length - 1;
+                });
             }
             function updateHpBar(monsterCard) {
                 const currentHp = parseInt(monsterCard.querySelector(".current-hp-input").value) || 0;
@@ -1790,56 +1682,12 @@
                     tagsContainer.appendChild(tag);
                 });
             }
-            function handleDragStart(e) {
-                if (this.classList.contains("locked")) {
-                    e.preventDefault();
-                    return false;
-                }
-                this.style.opacity = '0.4';
-                dragSrcEl = this;
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/html', this.innerHTML);
-            }
-            function handleDragOver(e) {
-                if (e.preventDefault) e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                return false;
-            }
-            function handleDragEnter() {
-                this.classList.add('drag-over');
-            }
-            function handleDragLeave() {
-                this.classList.remove('drag-over');
-            }
-            function handleDrop(e) {
-                if (e.stopPropagation) e.stopPropagation();
-                if (!dragSrcEl || dragSrcEl.classList.contains("locked") || this.classList.contains("locked")) return false;
-                if (dragSrcEl !== this) {
-                    const cards = Array.from(monsterContainer.querySelectorAll('.monster-card'));
-                    const srcIndex = cards.indexOf(dragSrcEl);
-                    const destIndex = cards.indexOf(this);
-                    if (srcIndex < destIndex) {
-                        monsterContainer.insertBefore(dragSrcEl, this.nextSibling);
-                    } else {
-                        monsterContainer.insertBefore(dragSrcEl, this);
-                    }
-                    const newOrderIds = Array.from(monsterContainer.querySelectorAll('.monster-card')).map(card => card.dataset.id);
-                    if (socket && socket.connected) {
-                        socket.emit('reorder-monsters', { sessionId: sessionId, order: newOrderIds });
-                    }
-                    saveToServer(true);
-                }
-                return false;
-            }
-            function handleDragEnd() {
-                this.style.opacity = '1';
-                document.querySelectorAll('.monster-card').forEach(card => card.classList.remove('drag-over'));
-            }
             addMonsterBtn.addEventListener("click", () => {
                 if (!isConnected) return alert("未连接到服务器，请检查网络连接并刷新页面");
                 const name = `${monsterNamePrefix.value} ${monsterCounter++}`;
                 const maxHp = parseInt(defaultHpInput.value) || 100;
                 monsterContainer.appendChild(createMonsterCard(name, maxHp, false));
+                updateSortButtonStatus();
                 saveToServer();
             });
             addAdventurerBtn.addEventListener("click", () => {
@@ -1847,6 +1695,7 @@
                 const name = `${adventurerNamePrefix.value} ${adventurerCounter++}`;
                 const maxHp = parseInt(defaultHpInput.value) || 100;
                 monsterContainer.appendChild(createMonsterCard(name, maxHp, true));
+                updateSortButtonStatus();
                 saveToServer();
             });
             resetAllBtn.addEventListener("click", () => {
@@ -1854,6 +1703,7 @@
                 if (confirm("确定要移除所有非锁定的怪物和冒险者吗？")) {
                     document.querySelectorAll('.monster-card:not(.locked)').forEach(card => card.remove());
                     if (!monsterContainer.querySelectorAll('.monster-card').length) showEmptyState();
+                    updateSortButtonStatus();
                     saveToServer();
                 }
             });
